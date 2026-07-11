@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Donkey Kong - Atari 2600 Port</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+canvas { image-rendering: pixelated; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="c" width="260" height="155" autofocus tabindex="-1"></canvas>
+<script>
+const cv=document.getElementById('c');const cx=cv.getContext('2d');
+
+// NTSC TIA colors
+const P=[
+[0,0,0],[255,255,255],[180,60,0],[200,170,50],[120,40,120],
+[180,50,50],[200,40,40],[80,40,0],[180,160,30],[0,70,170],
+[30,170,170],[30,130,130],[160,230,60]];
+const B=P[0],W=P[1],O=P[2],BLN=P[3],PU=P[4],SR=P[5],R=P[6],BR=P[7],YL=P[8],BL=P[9],TQ=P[10],BG=P[11],LG=P[12];
+
+const WH=27,NW=5,WSP=28;
+function wy(w){return 154-(4-w)*WSP}
+const LV=[[0x6D],[0x51,0x31],[0x59,0x6D],[0x45,0x31],[0x6D]];
+const RH=[0x75,0x69,0x5D,0x51,0x45,0x3A,0x2D];
+
+let st={mode:0,w:4,mx:0x31,my:0x9A,md:0xFF,lives:2,score:0,bt:80,obs:[],jht:0,hmt:0,fr:0,ot:0,dcd:0,got:0};
+let keys={},sp=false,lt=0;
+
+let ac=null;
+function ia(){if(ac)return;ac=new(window.AudioContext||window.webkitAudioContext)()}
+function pt(f,d,t,v){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();
+o.type=t||'square';o.frequency.value=f;g.gain.value=v||.08;
+g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);
+o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}
+function sW(){pt(800,.05,'square',.04)}
+function sJ(){pt(600,.1,'square',.08)}
+function sS(){pt(1200,.08,'square',.06)}
+function sD(){pt(200,.3,'sawtooth',.1);setTimeout(()=>pt(150,.4,'sawtooth',.08),300)}
+function sL(){pt(800,.1,'square',.08);setTimeout(()=>pt(1000,.1,'square',.08),100)}
+
+cv.addEventListener('click', ()=>cv.focus());
+document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')sp=true;e.preventDefault()});
+document.addEventListener('keyup',e=>{keys[e.code]=false;e.preventDefault()});
+
+function dR(x,y,w,h,c){cx.fillStyle='rgb('+c[0]+','+c[1]+','+c[2]+')';cx.fillRect(x,y,w,h)}
+
+function dS(sp,x,y,sc,clr){
+    for(let r=0;r<sp.length;r++){
+        const b=sp[r];
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c))dR(x+c*sc,y+(sp.length-1-r)*sc,sc,sc,clr);
+        }
+    }
+}
+
+// GF/Pauline multi-color sprite (18 rows x 8 pixels)
+const GF=[0x00, 0x00, 0x07, 0x1F, 0x3A, 0xBF, 0x7E, 0x9C, 0x38, 0x7E, 0x18, 0x3C, 0x7E, 0xFF, 0x7F, 0x7E, 0x82, 0x43];
+function drawGF(){
+    const gx=32,gy=wy(0)-38;
+    const gc=[BR,BR,BR,BR,BR,BR,BLN,TQ,TQ,SR,TQ,TQ,TQ,TQ,TQ,TQ,TQ,TQ];
+    for(let r=0;r<GF.length;r++){
+        const b=GF[r],cl=gc[r];
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c))dR(gx+c,gy+(GF.length-1-r),1,1,cl);
+        }
+    }
+}
+
+// DK sprite (20 rows x 8 pixels) from ASM - original order (head at top)
+const DK=[0x7C, 0x55, 0x7D, 0x45, 0x39, 0x7F, 0xFF, 0xFE, 0xBC, 0xDC, 0x5E, 0x3E, 0x7E, 0x7E, 0x67, 0x67, 0xE0, 0xE0];
+
+// Barrel sprite (8 rows x 8 pixels) from ASM - original order
+const BAR=[0x3C,0x6E,0xFB,0xBF,0xFD,0xDF,0x76,0x3C];
+
+// Stationary Mario sprite (17 rows x 8 pixels) from ASM
+const MARIO=[0x00, 0x3F, 0x1B, 0x1B, 0x3F, 0x7B, 0x75, 0x76, 0x7B, 0x3F, 0x1F, 0x3E, 0x0F, 0xDB, 0x99, 0x66, 0x00];
+
+// Number font (8x8)
+const NFO=[
+[0x3C,0x66,0x66,0x66,0x66,0x66,0x3C,0x00],
+[0x7E,0x18,0x18,0x18,0x38,0x18,0x08,0x00],
+[0x7E,0x18,0x18,0x7E,0x18,0x18,0x7E,0x00],
+[0x7E,0x18,0x18,0x7E,0x18,0x18,0x7E,0x00],
+[0x3C,0x24,0x24,0x7E,0x06,0x06,0x7E,0x00],
+[0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00],
+[0x7E,0x60,0x60,0x7E,0x60,0x60,0x7E,0x00],
+[0x7E,0x18,0x30,0x30,0x30,0x30,0x30,0x00],
+[0x7E,0x60,0x60,0x7E,0x60,0x60,0x7E,0x00],
+[0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00]];
+
+function drawPlats(){
+    for(let w=0;w<NW;w++){
+        const y=wy(w);
+        dR(20,y,220,3,BR);
+        const ls=LV[w]||[];
+        for(let lx of ls){
+            dR(lx,y,6,WSP,TQ);
+            for(let ry=y+3;ry<y+WSP;ry+=3)dR(lx,ry,6,1,TQ);
+        }
+    }
+}
+
+function drawDK(){dS(DK,10,wy(0)-38,2,BR)}
+function drawMario(){
+    const mx=st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx);
+    const my=st.my-16;
+    dS(MARIO,mx,my,1,R);
+}
+function drawBarrel(o){dS(BAR,o.x,o.y,1,O)}
+
+function drawScore(){
+    const d=[];let s=st.score;
+    for(let i=0;i<6;i++){d[i]=s%10;s=Math.floor(s/10)}
+    for(let i=0;i<6;i++){
+        const f=NFO[d[5-i]];
+        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+            if(f[r]&(0x80>>c))dR(190+i*8+c,2+r,1,1,BL);
+        }
+    }
+}
+
+function drawLives(){
+    const p=[0,1,5,21];
+    const pat=p[Math.min(st.lives,3)];
+    for(let c=0;c<8;c++)if(pat&(1<<c))dR(10+c,2,1,1,BG);
+}
+
+function drawBT(){
+    cx.fillStyle='rgb('+LG[0]+','+LG[1]+','+LG[2]+')';
+    cx.font='6px monospace';
+    cx.fillText((st.bt<10?'0':'')+st.bt,240,8);
+}
+
+function drawAttract(){
+    const bg=[BL,PU,R,BR,O][Math.floor(st.fr/20)%5];
+    cx.fillStyle='rgb('+bg[0]+','+bg[1]+','+bg[2]+')';
+    cx.fillRect(0,0,260,155);
+    drawPlats();
+    drawDK();
+    drawGF();
+    const marMX=120+Math.floor(Math.sin(st.fr/30)*40);
+    const marMY=wy(4)-16;
+    dS(MARIO,marMX,marMY,1,R);
+    cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
+    cx.font='bold 14px monospace';
+    cx.textAlign='center';
+    cx.fillText('DONKEY KONG',130,70);
+    cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
+    cx.font='6px monospace';
+    if(Math.floor(st.fr/30)%2)cx.fillText('PRESS SPACE TO START',130,85);
+    cx.fillStyle='rgb('+TQ[0]+','+TQ[1]+','+TQ[2]+')';
+    cx.fillText('ARROWS: MOVE',130,115);
+    cx.fillText('SPACE: JUMP',130,125);
+    cx.textAlign='left';
+}
+
+function drawGO(){
+    cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
+    cx.fillRect(0,0,260,155);
+    cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
+    cx.font='bold 10px monospace';
+    cx.textAlign='center';
+    cx.fillText('GAME OVER',130,75);
+    cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
+    cx.font='6px monospace';
+    if(Math.floor(st.fr/30)%2)cx.fillText('PRESS SPACE TO RESTART',130,90);
+    cx.textAlign='left';
+}
+
+function render(){
+    if(st.mode===0){drawAttract();return}
+    if(st.mode===1){drawGO();return}
+    if(st.mode!==128)return;
+    cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
+    cx.fillRect(0,0,260,155);
+    drawPlats();
+    drawDK();
+    drawGF();
+    for(let o of st.obs)drawBarrel(o);
+    drawMario();
+    drawScore();
+    drawLives();
+    drawBT();
+}
+
+function update(){
+    st.fr++;
+    if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false}return}
+    if(st.mode===1){st.got++;if(st.got>120){st.mode=0;st.lives=2;st.score=0;st.bt=80;
+        st.w=4;st.mx=0x31;st.my=0x9A;st.obs=[];st.ot=0}return}
+    if(st.mode!==128)return;
+    if(st.dcd>0){st.dcd--;return}
+    st.bt--;if(st.bt<=0){st.bt=80;sS()}
+    
+    // Mario movement
+    let dir=0xFF;
+    if(st.jht>0){dir=st.jht_dir;st.jht--;if(st.jht<=0)st.my=Math.min(st.my+7,255)}
+    if(!st.jht){
+        if(keys['ArrowLeft'])dir=0xFD;
+        if(keys['ArrowRight'])dir=0xFE;
+        
+        if(keys['ArrowUp']&&st.md<0){
+            if(st.w>0){
+                const ls=LV[st.w]||[];
+                for(let lx of ls)if(Math.abs(st.mx-lx)<3){
+                    st.my=Math.max(st.my-1,wy(st.w-1)+2);st.w--;st.md=0xFF;break}}
+        }
+        if(keys['ArrowDown']&&st.md<0){
+            if(st.w<NW-1){
+                const ls=LV[st.w]||[];
+                for(let lx of ls)if(Math.abs(st.mx-lx)<3){
+                    st.my=Math.min(st.my+1,wy(st.w+1)-2);st.w++;st.md=0xFF;break}}
+        }
+        
+        if(!keys['ArrowUp']&&!keys['ArrowDown']){
+            let nw=0;
+            for(let w=0;w<NW;w++){if(st.my<wy(w)+WH/2){nw=w;break}if(w===NW-1)nw=w}
+            st.w=nw;
+            
+            if(dir===0xFD&&st.mx>0x24){st.mx--;st.md=0}
+            if(dir===0xFE&&st.mx<0x7C){st.mx++;st.md=1}
+            st.md=dir;
+            
+            if(st.w>0&&st.w<NW-1){
+                if(dir===0xFD){
+                    for(let rx of RH)if(st.mx>=rx){st.w++;st.my=wy(st.w)-2;break}}
+                else if(dir===0xFE){
+                    for(let rx of RH)if(st.mx<=rx){st.w--;st.my=wy(st.w)+2;break}}
+            }
+            
+            if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
+            
+            if((keys['Space']||keys['KeyZ'])&&st.md<0&&st.hmt<=0){
+                st.jht=31;st.jht_dir=dir;st.my-=7;st.md=0xFF;sJ();
+            }
+        }
+    }
+    
+    for(let o of st.obs){
+        if(!o.a)continue;
+        if(o.s===1){
+            if(o.d===1)o.x++;else o.x--;
+            if(o.w>0&&o.w<NW-1){
+                if(o.d===1)for(let rx of RH)if(o.x>=rx){o.w++;o.y=wy(o.w)-2;o.d=0;break}
+                else for(let rx of RH)if(o.x<=rx){o.w--;o.y=wy(o.w)+2;o.d=1;break}}
+            const ls=LV[o.w]||[];
+            for(let lx of ls)if(Math.abs(o.x-lx)<3){o.s=0;break}
+        }else if(o.s===0){
+            o.y++;if(o.y>=wy(o.w)+5){o.s=1;o.d=1}
+        }
+        if(o.x<15||o.x>140)o.a=false;
+    }
+    
+    st.ot++;if(st.ot%60===0){
+        const act=st.obs.filter(o=>o.a);
+        if(act.length<4)st.obs.push({x:40+Math.floor(Math.random()*10),y:15,d:1,s:1,w:0,a:true});
+    }
+    
+    if(st.jht>0){
+        for(let o of st.obs){
+            if(!o.a)continue;
+            if(Math.abs(st.mx-o.x)<4&&Math.abs(st.my-o.y)<4){
+                st.score+=100;sS();
+            }
+        }
+    }
+    
+    if(st.jht<=0){
+        for(let o of st.obs){
+            if(!o.a)continue;
+            if(Math.abs(st.mx-o.x)<4&&Math.abs(st.my-o.y)<10){
+                st.lives--;sD();
+                if(st.lives<=0){st.mode=1;st.got=0}
+                else{st.dcd=120;st.my=0x9A;st.mx=0x31;st.w=4;st.md=0xFF;st.jht=0}
+                return;
+            }
+        }
+    }
+    
+    if(st.hmt>0)st.hmt--;
+}
+
+function loop(ts){
+    if(!lt)lt=ts;
+    const dt=ts-lt;lt=ts;
+    if(dt>=16){update();render()}
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
