@@ -51,7 +51,7 @@ function dS(sp,x,y,sc,clr){
     for(let r=0;r<sp.length;r++){
         const b=sp[r];
         for(let c=0;c<8;c++){
-            if(b&(0x80>>c))dR(x+c*sc,y+(sp.length-1-r)*sc,sc,sc,clr);
+            if(b&(0x80>>c))dR(x+c*sc,y+r*sc,sc,sc,clr);
         }
     }
 }
@@ -64,7 +64,7 @@ function drawGF(){
     for(let r=0;r<GF.length;r++){
         const b=GF[r],cl=gc[r];
         for(let c=0;c<8;c++){
-            if(b&(0x80>>c))dR(gx+c,gy+(GF.length-1-r),1,1,cl);
+            if(b&(0x80>>c))dR(gx+c,gy+r,1,1,cl);
         }
     }
     }
@@ -93,14 +93,76 @@ const NFO=[
 [0x7E,0x60,0x60,0x7E,0x60,0x60,0x7E,0x00],
 [0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00]];
 
+// Zigzag platform pattern per walkway from ASM PF data
+// walk0=DK plat,1-4=zigzag,5=ground
+// Each walkway has 24 scanlines of playfield data. Each segment is [left,right].
+// The pattern alternates based on the PF0/PF1/PF2 TIA data.
+// Values are in canvas x-coordinates.
+const ZIG=[
+    // walk0 (DK platform): full width, rivet pattern on left edge
+    [[20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240]],
+    // walk1: left zigzag - platform extends right from variable left edge
+    [[44,240],[44,240],[44,240],[44,240],
+     [24,240],[24,240],[24,240],[24,240],
+     [44,240],[44,240],[44,240],[44,240],
+     [24,240],[24,240],[24,240],[24,240],
+     [24,240],[24,240],[24,240],[24,240],
+     [24,240],[24,240],[24,240],[24,240]],
+    // walk2: right zigzag - platform extends left from variable right edge
+    [[20,216],[20,216],[20,216],[20,216],
+     [20,236],[20,236],[20,236],[20,236],
+     [20,216],[20,216],[20,216],[20,216],
+     [20,236],[20,236],[20,236],[20,236],
+     [20,236],[20,236],[20,236],[20,236],
+     [20,236],[20,236],[20,236],[20,236]],
+    // walk3: left zigzag (narrow) - platform notches on left
+    [[36,176],[36,176],[36,176],[36,176],
+     [20,176],[20,176],[20,176],[20,176],
+     [36,176],[36,176],[36,176],[36,176],
+     [20,176],[20,176],[20,176],[20,176],
+     [20,176],[20,176],[20,176],[20,176],
+     [20,176],[20,176],[20,176],[20,176]],
+    // walk4: right zigzag (wide) - platform notches on right
+    [[20,220],[20,220],[20,220],[20,220],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,220],[20,220],[20,220],[20,220],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240],
+     [20,240],[20,240],[20,240],[20,240]]
+];
+
 function drawPlats(){
+    // Draw DK platform (walkway 0 - top)
+    const y0=wy(0);
+    const z0=ZIG[0];
+    for(let r=0;r<24;r++){
+        dR(z0[r][0],y0+r,z0[r][1]-z0[r][0],1,BR);
+    }
+    // Draw walkways 1-4 with zigzag
+    for(let w=1;w<NW;w++){
+        const y=wy(w);
+        const z=ZIG[w];
+        for(let r=0;r<24;r++){
+            if(z[r][1]-z[r][0]>0)dR(z[r][0],y+r,z[r][1]-z[r][0],1,BR);
+        }
+    }
+    // Draw ground (walkway 5)
+    const y5=wy(4)+WSP;
+    dR(20,y5,220,3,BR);
+    // Draw ladders
     for(let w=0;w<NW;w++){
         const y=wy(w);
-        dR(20,y,220,3,BR);
         const ls=LV[w]||[];
         for(let lx of ls){
-            dR(lx,y,6,WSP,TQ);
-            for(let ry=y+3;ry<y+WSP;ry+=3)dR(lx,ry,6,1,TQ);
+            // Ladder top rail
+            dR(lx,y,6,2,TQ);
+            // Ladder rungs
+            for(let ry=y+2;ry<y+WSP;ry+=5)dR(lx+1,ry,4,1,TQ);
         }
     }
 }
