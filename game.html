@@ -10,7 +10,7 @@ canvas { image-rendering: pixelated; width: 100vw; height: 100vh; }
 </style>
 </head>
 <body>
-<canvas id="c" width="260" height="155" autofocus tabindex="-1"></canvas>
+<canvas id="c" width="260" height="155" autofocus></canvas>
 <script>
 const cv=document.getElementById('c');const cx=cv.getContext('2d');
 
@@ -26,7 +26,7 @@ function wy(w){return 154-(4-w)*WSP}
 const LV=[[0x6D],[0x51,0x31],[0x59,0x6D],[0x45,0x31],[0x6D]];
 const RH=[0x75,0x69,0x5D,0x51,0x45,0x3A,0x2D];
 
-let st={mode:0,w:4,mx:0x31,my:0x9A,md:0xFF,lives:2,score:0,bt:80,obs:[],jht:0,hmt:0,fr:0,ot:0,dcd:0,got:0};
+let st={mode:0,w:4,mx:0x31,my:0x9A,md:-1,lives:2,score:0,bt:80,obs:[],jht:0,hmt:0,fr:0,ot:0,dcd:0,got:0};
 let keys={},sp=false,lt=0;
 
 let ac=null;
@@ -41,9 +41,9 @@ function sS(){pt(1200,.08,'square',.06)}
 function sD(){pt(200,.3,'sawtooth',.1);setTimeout(()=>pt(150,.4,'sawtooth',.08),300)}
 function sL(){pt(800,.1,'square',.08);setTimeout(()=>pt(1000,.1,'square',.08),100)}
 
-cv.addEventListener('click', ()=>cv.focus());
-document.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')sp=true;e.preventDefault()});
-document.addEventListener('keyup',e=>{keys[e.code]=false;e.preventDefault()});
+window.addEventListener('click', ()=>cv.focus());
+window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space')sp=true;if(e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='ArrowLeft'||e.code==='ArrowRight'||e.code==='Space')e.preventDefault()});
+window.addEventListener('keyup',e=>{keys[e.code]=false;e.preventDefault()});
 
 function dR(x,y,w,h,c){cx.fillStyle='rgb('+c[0]+','+c[1]+','+c[2]+')';cx.fillRect(x,y,w,h)}
 
@@ -209,13 +209,13 @@ function update(){
             if(st.w>0){
                 const ls=LV[st.w]||[];
                 for(let lx of ls)if(Math.abs(st.mx-lx)<3){
-                    st.my=Math.max(st.my-1,wy(st.w-1)+2);st.w--;st.md=0xFF;break}}
+                    st.my=Math.max(st.my-1,wy(st.w-1)+2);st.w--;st.md=-1;break}}
         }
         if(keys['ArrowDown']&&st.md<0){
             if(st.w<NW-1){
                 const ls=LV[st.w]||[];
                 for(let lx of ls)if(Math.abs(st.mx-lx)<3){
-                    st.my=Math.min(st.my+1,wy(st.w+1)-2);st.w++;st.md=0xFF;break}}
+                    st.my=Math.min(st.my+1,wy(st.w+1)-2);st.w++;st.md=-1;break}}
         }
         
         if(!keys['ArrowUp']&&!keys['ArrowDown']){
@@ -224,10 +224,9 @@ function update(){
             st.w=nw;
             
             if(dir===0xFD&&st.mx>0x24){st.mx--;st.md=0}
-            if(dir===0xFE&&st.mx<0x7C){st.mx++;st.md=1}
-            st.md=dir;
+                        if(dir===0xFE&&st.mx<0x7C){st.mx++;st.md=1}
             
-            if(st.w>0&&st.w<NW-1){
+                        if(st.w>0&&st.w<NW-1){
                 if(dir===0xFD){
                     for(let rx of RH)if(st.mx>=rx){st.w++;st.my=wy(st.w)-2;break}}
                 else if(dir===0xFE){
@@ -237,7 +236,7 @@ function update(){
             if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
             
             if((keys['Space']||keys['KeyZ'])&&st.md<0&&st.hmt<=0){
-                st.jht=31;st.jht_dir=dir;st.my-=7;st.md=0xFF;sJ();
+                            st.jht=31;st.jht_dir=dir;st.my-=7;st.md=-1;sJ();
             }
         }
     }
@@ -277,7 +276,7 @@ function update(){
             if(Math.abs(st.mx-o.x)<4&&Math.abs(st.my-o.y)<10){
                 st.lives--;sD();
                 if(st.lives<=0){st.mode=1;st.got=0}
-                else{st.dcd=120;st.my=0x9A;st.mx=0x31;st.w=4;st.md=0xFF;st.jht=0}
+                else{st.dcd=120;st.my=0x9A;st.mx=0x31;st.w=4;st.md=-1;st.jht=0}
                 return;
             }
         }
