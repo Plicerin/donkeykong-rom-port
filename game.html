@@ -56,23 +56,23 @@ function dS(sp,x,y,sc,clr){
     }
 }
 
-// GF/Pauline multi-color sprite (18 rows x 8 pixels)
-const GF=[0x00, 0x00, 0x07, 0x1F, 0x3A, 0xBF, 0x7E, 0x9C, 0x38, 0x7E, 0x18, 0x3C, 0x7E, 0xFF, 0x7F, 0x7E, 0x82, 0x43];
+// GF/Pauline multi-color sprite (20 rows x 8 pixels)
+const GF=[0x00,0x43,0x82,0x7E,0x7F,0xFF,0x7E,0x3C,0x18,0x7E,0x38,0x9C,0x7E,0xBF,0x3A,0x1F,0x07,0x00,0x00,0x00];
 function drawGF(){
     const gx=32,gy=wy(0)-38;
-    const gc=[BR,BR,BR,BR,BR,BR,BLN,TQ,TQ,SR,TQ,TQ,TQ,TQ,TQ,TQ,TQ,TQ];
+    const gc=[YL,YL,TQ,TQ,TQ,TQ,TQ,SR,TQ,TQ,BLN,BLN,BLN,BLN,BLN,BLN,BLN,BLN,BLN,BLN];
     for(let r=0;r<GF.length;r++){
         const b=GF[r],cl=gc[r];
         for(let c=0;c<8;c++){
             if(b&(0x80>>c))dR(gx+c,gy+(GF.length-1-r),1,1,cl);
         }
     }
-}
+    }
 
 // DK sprite (20 rows x 8 pixels) from ASM - original order (head at top)
-const DK=[0x7C, 0x55, 0x7D, 0x45, 0x39, 0x7F, 0xFF, 0xFE, 0xBC, 0xDC, 0x5E, 0x3E, 0x7E, 0x7E, 0x67, 0x67, 0xE0, 0xE0];
+const DK=[0xE0, 0xE0, 0x67, 0x67, 0x7E, 0x7E, 0x3E, 0x5E, 0xDC, 0xBC, 0xFE, 0xFF, 0x7F, 0x39, 0x45, 0x7D, 0x55, 0x7C, 0x38];
 
-// Barrel sprite (8 rows x 8 pixels) from ASM - original order
+
 const BAR=[0x3C,0x6E,0xFB,0xBF,0xFD,0xDF,0x76,0x3C];
 
 // Stationary Mario sprite (17 rows x 8 pixels) from ASM
@@ -103,7 +103,9 @@ function drawPlats(){
     }
 }
 
-function drawDK(){dS(DK,10,wy(0)-38,2,BR)}
+function drawDK(){
+    dS(DK,10,wy(0)-38,2,BR);
+}
 function drawMario(){
     const mx=st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx);
     const my=st.my-16;
@@ -176,10 +178,10 @@ function render(){
     if(st.mode!==128)return;
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,260,155);
-    drawPlats();
-    drawDK();
-    drawGF();
-    for(let o of st.obs)drawBarrel(o);
+        drawPlats();
+        drawDK();
+        drawGF();
+            for(let o of st.obs)drawBarrel(o);
     drawMario();
     drawScore();
     drawLives();
