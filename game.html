@@ -94,46 +94,41 @@ const NFO=[
 [0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00]];
 
 // Zigzag platform pattern per walkway from ASM PF data
-// walk0=DK plat,1-4=zigzag,5=ground
-// Each walkway has 24 scanlines of playfield data. Each segment is [left,right].
-// The pattern alternates based on the PF0/PF1/PF2 TIA data.
-// Values are in canvas x-coordinates.
+// walk0=DK plat full-width, walk1/3=left zigzag, walk2/4=right zigzag
+// Each walkway 24 scanlines. Pattern: 4-scanline alternating groups.
+// The difference between wide and narrow creates the visible zigzag V-notch.
 const ZIG=[
-    // walk0 (DK platform): full width, rivet pattern on left edge
-    [[20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240]],
-    // walk1: left zigzag - platform extends right from variable left edge
+    // walk0: DK platform full width
+    Array(24).fill([20,240]),
+    // walk1: LEFT zigzag - notch on left side
+    // Top: narrow (notch in), middle: wide (extends left), bottom: narrow
     [[44,240],[44,240],[44,240],[44,240],
      [24,240],[24,240],[24,240],[24,240],
      [44,240],[44,240],[44,240],[44,240],
      [24,240],[24,240],[24,240],[24,240],
-     [24,240],[24,240],[24,240],[24,240],
-     [24,240],[24,240],[24,240],[24,240]],
-    // walk2: right zigzag - platform extends left from variable right edge
+     [28,240],[28,240],[28,240],[28,240],
+     [28,240],[28,240],[28,240],[28,240]],
+    // walk2: RIGHT zigzag - notch on right side
+    [[20,208],[20,208],[20,208],[20,208],
+     [20,228],[20,228],[20,228],[20,228],
+     [20,208],[20,208],[20,208],[20,208],
+     [20,228],[20,228],[20,228],[20,228],
+     [20,212],[20,212],[20,212],[20,212],
+     [20,212],[20,212],[20,212],[20,212]],
+    // walk3: LEFT zigzag - narrower overall, larger notch
+    [[52,172],[52,172],[52,172],[52,172],
+     [28,172],[28,172],[28,172],[28,172],
+     [52,172],[52,172],[52,172],[52,172],
+     [28,172],[28,172],[28,172],[28,172],
+     [36,172],[36,172],[36,172],[36,172],
+     [36,172],[36,172],[36,172],[36,172]],
+    // walk4: RIGHT zigzag - wider overall, subtle notch
     [[20,216],[20,216],[20,216],[20,216],
-     [20,236],[20,236],[20,236],[20,236],
+     [20,240],[20,240],[20,240],[20,240],
      [20,216],[20,216],[20,216],[20,216],
-     [20,236],[20,236],[20,236],[20,236],
-     [20,236],[20,236],[20,236],[20,236],
-     [20,236],[20,236],[20,236],[20,236]],
-    // walk3: left zigzag (narrow) - platform notches on left
-    [[36,176],[36,176],[36,176],[36,176],
-     [20,176],[20,176],[20,176],[20,176],
-     [36,176],[36,176],[36,176],[36,176],
-     [20,176],[20,176],[20,176],[20,176],
-     [20,176],[20,176],[20,176],[20,176],
-     [20,176],[20,176],[20,176],[20,176]],
-    // walk4: right zigzag (wide) - platform notches on right
-    [[20,220],[20,220],[20,220],[20,220],
      [20,240],[20,240],[20,240],[20,240],
-     [20,220],[20,220],[20,220],[20,220],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,240],[20,240],[20,240],[20,240]]
+     [20,224],[20,224],[20,224],[20,224],
+     [20,224],[20,224],[20,224],[20,224]]
 ];
 
 function drawPlats(){
