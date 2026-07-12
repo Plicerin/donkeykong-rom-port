@@ -63,13 +63,11 @@ function drawGF(){
     const gc=[YL,YL,TQ,TQ,TQ,TQ,TQ,SR,TQ,TQ,BLN,BLN,BLN,BLN,BLN,BLN,BLN,BLN,BLN,BLN];
     for(let r=0;r<GF.length;r++){
         const b=GF[r],cl=gc[r];
-        for(let c=0;c<8;c++){
-            if(b&(0x80>>c))dR(gx+c,gy+r,1,1,cl);
-        }
+        if(cl)for(let c=0;c<8;c++)if(b&(0x80>>c))dR(gx+c,gy+r,1,1,cl);
     }
-    }
+}
 
-// DK sprite (20 rows x 8 pixels) from ASM - original order (head at top)
+// DK sprite (19 rows x 8 pixels) from ASM - original order (head at top)
 const DK=[0xE0, 0xE0, 0x67, 0x67, 0x7E, 0x7E, 0x3E, 0x5E, 0xDC, 0xBC, 0xFE, 0xFF, 0x7F, 0x39, 0x45, 0x7D, 0x55, 0x7C, 0x38];
 
 
@@ -93,42 +91,26 @@ const NFO=[
 [0x7E,0x60,0x60,0x7E,0x60,0x60,0x7E,0x00],
 [0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00]];
 
-// Zigzag platform pattern per walkway from ASM PF data
-// walk0=DK plat full-width, walk1/3=left zigzag, walk2/4=right zigzag
-// Each walkway 24 scanlines. Pattern: 4-scanline alternating groups.
-// The difference between wide and narrow creates the visible zigzag V-notch.
+// Zigzag platform pattern per walkway from Atari2600 reference
+// ALL platforms have 3-step zigzag on BOTH left and right edges
+// Surface bar (top 3 rows) is WIDEST. Steps descend on both sides.
+// Each walkway = 24 scanlines. Top 3 = widest, then 3 steps of 3 rows each, then 12 constant
+function mkZig(l,r){
+    const a=[];
+    for(let i=0;i<3;i++)a.push([l,r]);      // top surface (3 rows)
+    for(let i=0;i<3;i++)a.push([l+8,r-8]);  // step 1 (3 rows)
+    for(let i=0;i<3;i++)a.push([l+16,r-16]);// step 2 (3 rows)
+    for(let i=0;i<3;i++)a.push([l+24,r-24]);// step 3 (3 rows)
+    for(let i=0;i<12;i++)a.push([l+24,r-24]);// constant (12 rows)
+    return a;
+}
+// l=left edge x, r=right edge x (platform spans l..r)
 const ZIG=[
-    // walk0: DK platform full width
-    Array(24).fill([20,240]),
-    // walk1: LEFT zigzag - notch on left side
-    // Top: narrow (notch in), middle: wide (extends left), bottom: narrow
-    [[44,240],[44,240],[44,240],[44,240],
-     [24,240],[24,240],[24,240],[24,240],
-     [44,240],[44,240],[44,240],[44,240],
-     [24,240],[24,240],[24,240],[24,240],
-     [28,240],[28,240],[28,240],[28,240],
-     [28,240],[28,240],[28,240],[28,240]],
-    // walk2: RIGHT zigzag - notch on right side
-    [[20,208],[20,208],[20,208],[20,208],
-     [20,228],[20,228],[20,228],[20,228],
-     [20,208],[20,208],[20,208],[20,208],
-     [20,228],[20,228],[20,228],[20,228],
-     [20,212],[20,212],[20,212],[20,212],
-     [20,212],[20,212],[20,212],[20,212]],
-    // walk3: LEFT zigzag - narrower overall, larger notch
-    [[52,172],[52,172],[52,172],[52,172],
-     [28,172],[28,172],[28,172],[28,172],
-     [52,172],[52,172],[52,172],[52,172],
-     [28,172],[28,172],[28,172],[28,172],
-     [36,172],[36,172],[36,172],[36,172],
-     [36,172],[36,172],[36,172],[36,172]],
-    // walk4: RIGHT zigzag - wider overall, subtle notch
-    [[20,216],[20,216],[20,216],[20,216],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,216],[20,216],[20,216],[20,216],
-     [20,240],[20,240],[20,240],[20,240],
-     [20,224],[20,224],[20,224],[20,224],
-     [20,224],[20,224],[20,224],[20,224]]
+    mkZig(20,240),  // walk0: DK platform full width
+    mkZig(20,236),  // walk1: nearly full width
+    mkZig(20,224),  // walk2: slightly narrower right
+    mkZig(28,204),  // walk3: narrower overall
+    mkZig(20,242)   // walk4: wide
 ];
 
 function drawPlats(){
