@@ -26,7 +26,7 @@ function wy(w){return 154-(4-w)*WSP}
 const LV=[[0x6D],[0x51,0x31],[0x59,0x6D],[0x45,0x31],[0x6D]];
 const RH=[0x75,0x69,0x5D,0x51,0x45,0x3A,0x2D];
 
-let st={mode:0,w:4,mx:0x31,my:0x9A,md:-1,lives:2,score:0,bt:80,obs:[],jht:0,hmt:0,fr:0,ot:0,dcd:0,got:0};
+let st={mode:0,w:4,mx:0x31,my:0x9A,md:-1,lives:2,score:0,bt:80,obs:[],jht:0,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0};
 let keys={},sp=false,lt=0;
 
 let ac=null;
@@ -242,6 +242,28 @@ function update(){
     // Mario movement
     let dir=0xFF;
     if(st.jht>0){dir=st.jht_dir;st.jht--;if(st.jht<=0)st.my=Math.min(st.my+7,255)}
+    
+    // --- Falling (walked off platform edge) ---
+    if(st.flg){
+        st.my += 2;
+        // Check landing on walkway below
+        for(let w=0;w<NW;w++){
+            const surf=ZIG[w][0];
+            if(st.mx>=surf[0]&&st.mx<=surf[1]&&Math.abs(st.my-wy(w))<4){
+                st.w=w;st.my=wy(w);st.flg=0;st.jht=0;break
+            }
+        }
+        // Fell too far - die
+        if(st.my>wy(4)+10){
+            st.lives--;sD();
+            if(st.lives<=0){st.mode=1;st.got=0}
+            else{st.dcd=120;st.my=0x9A;st.mx=0x31;st.w=4;st.md=-1;st.jht=0;st.flg=0}
+            return;
+        }
+        if(st.hmt>0)st.hmt--;
+        return;
+    }
+    
     if(!st.jht){
         if(keys['ArrowLeft'])dir=0xFD;
         if(keys['ArrowRight'])dir=0xFE;
@@ -264,20 +286,31 @@ function update(){
             for(let w=0;w<NW;w++){if(st.my<wy(w)+WH/2){nw=w;break}if(w===NW-1)nw=w}
             st.w=nw;
             
-            if(dir===0xFD&&st.mx>0x24){st.mx--;st.md=0}
-                        if(dir===0xFE&&st.mx<0x7C){st.mx++;st.md=1}
+            // Platform surface boundaries
+            const surf=ZIG[st.w][0];
+            const leftB=surf[0],rightB=surf[1];
             
-                        if(st.w>0&&st.w<NW-1){
+            if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
+            if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
+            
+            // Walked off edge?
+            if(dir===0xFD&&st.mx<=leftB)st.flg=1;
+            if(dir===0xFE&&st.mx>=rightB)st.flg=1;
+            
+            if(st.w>0&&st.w<NW-1){
                 if(dir===0xFD){
                     for(let rx of RH)if(st.mx>=rx){st.w++;st.my=wy(st.w)-2;break}}
                 else if(dir===0xFE){
                     for(let rx of RH)if(st.mx<=rx){st.w--;st.my=wy(st.w)+2;break}}
             }
             
+            // Snap to platform surface
+            if(!st.flg&&st.jht<=0&&st.md>=0)st.my=wy(st.w);
+            
             if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
             
             if((keys['Space']||keys['KeyZ'])&&st.md<0&&st.hmt<=0){
-                            st.jht=31;st.jht_dir=dir;st.my-=7;st.md=-1;sJ();
+                st.jht=31;st.jht_dir=dir;st.my-=7;st.md=-1;sJ();
             }
         }
     }
