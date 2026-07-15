@@ -159,7 +159,7 @@ const PLAT_DATA = {
 
 let st={mode:0,w:5,mx:160,my:228,md:-1,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,
-        cl:0,ct:0,cx:0};
+        cl:0,ct:0,cx:0,bjc:0};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
 function loadRef(){
@@ -264,6 +264,18 @@ function drawScore(){
     }
 }
 
+function drawBJCount(){
+    const d=[];let n=st.bjc;
+    for(let i=0;i<3;i++){d[i]=n%10;n=Math.floor(n/10)}
+    for(let i=0;i<3;i++){
+        const f=NFO[d[2-i]];
+        if(!f)continue;
+        for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+            if(f[r]&(0x80>>c))dR(260+i*8+c,12+r,1,1,YL);
+        }
+    }
+}
+
 function drawLives(){
     for(let i=0;i<st.lives;i++){
         for(let r=0;r<8;r++){
@@ -314,6 +326,7 @@ function render(){
     for(let o of st.obs)drawBarrel(o);
     drawMario();
     drawScore();
+    drawBJCount();
     drawLives();
 }
 
@@ -470,6 +483,17 @@ function update(){
                 if(st.lives<=0){st.mode=1;st.got=0}
                 else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0}
                 return;
+            }
+        }
+    }
+
+    // Barrel-jump counter: Mario airborne & passes directly over a barrel
+    if(st.flg||st.jht>0){
+        for(let o of st.obs){
+            if(!o.a||o.bj)continue;
+            if(Math.abs(st.mx-o.x)<6&&st.my<o.y-12){
+                o.bj=1;
+                st.bjc++;
             }
         }
     }
