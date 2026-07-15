@@ -396,79 +396,71 @@ function update(){
         st.my-=7;st.md=-1;sJ();
     }
 
-    // === BARRELS (ASM-based) ===
-                    st.brs=Math.min(40,80-Math.floor(st.score/300));
-                    for(let i=st.obs.length-1;i>=0;i--){
-                        const o=st.obs[i];
-                        if(!o.a){st.obs.splice(i,1);continue}
+    // === BARRELS (ASM-exact) ===
+                            // ASM constants: ROLL_SPEED=1, FALL_SPEED=2
+                            // RampHorizValues = $2D,$3A,$45,$51,$5D,$69,$75 (45,58,69,81,93,105,117)
+                            // Mapped to canvas 320px → ASM x-range 36-124 (scale=320/128=2.5):
+                            const RAMP_X=[112,145,173,203,233,263,293];
+                            const RAMP_LEFT=[44,77,105,135,165,195,225]; // mirrored for left-moving barrels
 
-                        // ASM: 7 ramp threshold x-positions (scaled from $2D,$3A,$45,$51,$5D,$69,$75)
-                        // 128-pixel → 320-pixel scale factor = 2.5
-                        const RAMP_X=[112,145,172,202,232,262,292];
-                        const spd=o.fb?2:1; // ASM: 1 px/frame roll, fire barrel faster
+                            st.brs=Math.min(40,80-Math.floor(st.score/300));
+                            for(let i=st.obs.length-1;i>=0;i--){
+                                const o=st.obs[i];
+                                if(!o.a){st.obs.splice(i,1);continue}
 
-                        if(o.s===1){ // ROLL state (ASM: MoveBarrelObject)
-                            o.x+=o.d*spd;
+                                // ASM: roll at 1 px/frame (fire barrel = 2)
+                                const spd=o.fb?2:1;
 
-                            // ASM RampHorizValues: on walkways 1-4, when x matches threshold, y+=1
-                            // This creates a staircase descent within the walkway band
-                            if(o.w>=1&&o.w<=4){
-                                for(let ri=0;ri<RAMP_X.length;ri++){
-                                    if(o.x===RAMP_X[ri]){
-                                        o.y+=1; // ASM: inc verPosP1,x
-                                        break;
+                                if(o.s===1){ // ROLLING state
+                                    o.x+=o.d*spd;
+
+                                    // ASM ramp staircase: at 7 fixed x positions, y+=1 on walkways 1-4
+                                    if(o.w>=1&&o.w<=4){
+                                        const rampPositions=o.d>0?RAMP_X:RAMP_LEFT;
+                                        for(let ri=0;ri<7;ri++){
+                                            // ASM: effective x = barrel.x (or barrel.x+1 when moving left via iny)
+                                            const ex=o.d>0?o.x:o.x+1;
+                                            if(ex===rampPositions[ri]){
+                                                o.y+=1;
+                                                break;
+                                            }
+                                        }
                                     }
+
+                                    // Walkway edge → enter falling state (ASM ladder equivalent)
+                                    const surf=ZIG[o.w];
+                                    if(o.d>0&&o.x>=surf[1]){
+                                        if(o.w===5){o.a=false;continue}
+                                        o.ty=Math.min(o.w+1,5);
+                                        o.s=2;
+                                    }else if(o.d<0&&o.x<=surf[0]){
+                                        if(o.w===5){o.a=false;continue}
+                                        o.ty=Math.min(o.w+1,5);
+                                        o.s=2;
+                                    }
+                                }else if(o.s===2){ // FALLING state — diagonal ramp descent
+                                    // Follow ramp: x moves in current direction, y falls at 2px/frame
+                                    o.x+=o.d*spd;
+                                    o.y+=2; // ASM: inc verPosP1,x twice
+
+                                    if(o.y>=wy(o.ty)){
+                                        o.y=wy(o.ty);
+                                        o.w=o.ty;
+                                        o.s=1;
+                                        o.d=-o.d; // ASM: eor #$F1 → toggle direction
+                                    }
+                                    if(o.y>240)o.a=false;
                                 }
+
+                                if(o.w===5&&o.x<92)o.a=false;
+                                if(o.x<0||o.x>320)o.a=false;
                             }
 
-                            // Edge transition: barrel rolls off platform edge → ramp descent
-                                                        const surf=ZIG[o.w];
-                                                        // ASM: direction toggles after descent (eor $F1), so sweep inward
-                                                        // Per-walkway dx chosen so barrel lands inside target platform
-                                                        const RAMP_DX_RIGHT=[-2,0,-1,0,-1]; // w=0,1,2,3,4 rolling off RIGHT edge
-                                                        const RAMP_DX_LEFT=[0,2,0,1,0];     // w=0,1,2,3,4 rolling off LEFT edge
-                                                        if(o.d>0&&o.x>=surf[1]){
-                                                            o.s=2;
-                                                            o.ty=Math.min(o.w+1,5);
-                                                            o.dy=1;
-                                                            o.dx=RAMP_DX_RIGHT[o.w];
-                                                        }else if(o.d<0&&o.x<=surf[0]){
-                                                            if(o.w===5){
-                                                                o.a=false; // off left side of ground = despawn
-                                                                continue;
-                                                            }
-                                                            o.s=2;
-                                                            o.ty=Math.min(o.w+1,5);
-                                                            o.dy=1;
-                                                            o.dx=RAMP_DX_LEFT[o.w];
-                                                        }
-                        }else if(o.s===2){ // RAMP state (diagonal descent)
-                            o.x+=o.dx;
-                            o.y+=o.dy;
-
-                            if(o.y>=wy(o.ty)){
-                                o.y=wy(o.ty);
-                                o.w=o.ty;
-                                o.s=1;
-                                // ASM: direction toggles after ladder/descent (eor #OBSTACLE_MOVING_DOWN|RIGHT)
-                                o.d=-o.d;
-                                const ns=ZIG[o.w];
-                                if(o.x<ns[0])o.x=ns[0];
-                                if(o.x>ns[1])o.x=ns[1];
-                            }
-                            if(o.y>240)o.a=false;
+                st.ot++;
+                if(st.ot%st.brs===0){
+                            const act=st.obs.filter(o=>o.a&&o.s!==0);
+                            if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,vy:0,ty:0,fb:Math.random()<0.1});
                         }
-
-                        // ASM checkBarrelDone: remove if x < XMIN_LEVEL1-1 ($23≈35, scaled ≈92)
-                        if(o.w===5&&o.x<92)o.a=false;
-                        if(o.x<0||o.x>320)o.a=false;
-                    }
-
-        st.ot++;
-        if(st.ot%st.brs===0){
-                    const act=st.obs.filter(o=>o.a&&o.s!==0);
-                    if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,fb:Math.random()<0.1});
-                }
 
     if(st.jht<=0){
         for(let o of st.obs){
