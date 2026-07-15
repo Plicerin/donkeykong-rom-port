@@ -27,8 +27,8 @@ const BG=[30,130,130];  // background teal
 const LG=[160,230,60];  // lime
 
 // Walkway y-positions (from reference GIF at native 320x240)
-const WY=[70,131,155,183,228];
-const NW=5;
+const WY=[70,95,131,155,183,228];
+const NW=6;
 function wy(w){return WY[w]}
 
 // Walkway surface x-ranges (from reference color scan)
@@ -37,7 +37,7 @@ function wy(w){return WY[w]}
 // W2: posts at [128-135,176-183], gap = [136-175]
 // W3: posts at [96-103,160-167], gap = [104-159]
 // Ground: full surface [64-255]
-const ZIG=[[64,159],[96,143],[128,183],[96,167],[64,255]];
+const ZIG=[[64,159],[64,239],[96,143],[128,183],[96,167],[64,255]];
 
 // Platform data from reference color scan (320px)
 // Format: {y: [[x1,x2], ...]}
@@ -157,7 +157,7 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-let st={mode:0,w:4,mx:160,my:228,md:-1,lives:2,score:0,bt:80,obs:[],brs:80,
+let st={mode:0,w:5,mx:160,my:228,md:-1,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,
         cl:0,ct:0,cx:0};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
@@ -230,12 +230,8 @@ const BAR=[0x3C,0x76,0xDF,0xFD,0xBF,0xFB,0x6E,0x3C];
 const BAR2=[0x3C,0x7E,0xDD,0xDF,0xF7,0xB7,0x7E,0x3C];
 function drawBarrel(o){
     const col=o.fb?[40,100,255]:O; // fire barrel = blue
-    if(o.s===2){ // bounce — add hop visual
-        const hop=Math.sin(o.sc/o.rc*Math.PI)*4;
-        dS(st.fr%2?BAR:BAR2,o.x,o.y-7-hop,col);
-    }else{
-        dS(st.fr%2?BAR:BAR2,o.x,o.y-7,col);
-    }
+    const hop=(o.s===2)?Math.sin(st.fr*0.2)*3:0; // continuous bounce on ramp
+    dS(st.fr%2?BAR:BAR2,o.x,o.y-7-hop,col);
 }
 const MARIO=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0x1F,0x3F,0x7B,0x76,0x75,0x7B,0x3F,0x1B,0x1B,0x3F,0x00];
 
@@ -333,7 +329,7 @@ function update(){
     st.fr++;
     if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false}return}
     if(st.mode===1){st.got++;if(st.got>120){st.mode=0;st.lives=2;st.score=0;st.bt=80;
-        st.w=4;st.mx=160;st.my=228;st.obs=[];st.ot=0}return}
+        st.w=5;st.mx=160;st.my=228;st.obs=[];st.ot=0}return}
     if(st.mode!==128)return;
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
@@ -345,10 +341,10 @@ function update(){
         if(pw>=0){
             st.w=pw;st.my=wy(pw);st.flg=0;st.jht=0;
         }
-        if(st.my>wy(4)+20){
+        if(st.my>wy(5)+20){
             st.lives--;sD();
-            if(st.lives<=0){st.mode=1;st.got=0}
-            else{st.dcd=120;st.my=228;st.mx=160;st.w=4;st.md=-1;st.jht=0;st.flg=0}
+                        if(st.lives<=0){st.mode=1;st.got=0}
+                        else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0;st.flg=0}
             return;
         }
         return;
@@ -370,17 +366,27 @@ function update(){
     }
 
     // === GROUNDED MOVEMENT ===
-    let dir=0xFF;
-    if(keys['ArrowLeft'])dir=0xFD;
-    if(keys['ArrowRight'])dir=0xFE;
+            let dir=0xFF;
+            if(keys['ArrowLeft'])dir=0xFD;
+            if(keys['ArrowRight'])dir=0xFE;
 
-    const surf=ZIG[st.w];
-    const leftB=surf[0],rightB=surf[1];
+            const surf=ZIG[st.w];
+            const leftB=surf[0],rightB=surf[1];
+            // Allow walking past edges for all walkways EXCEPT ground (w=5)
+            if(st.w===5){
+                if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
+                if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
+            }else{
+                if(dir===0xFD&&st.mx>0){st.mx--;st.md=0}
+                if(dir===0xFE&&st.mx<315){st.mx++;st.md=1}
+            }
 
-    if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
-    if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
-
-    if(!st.flg&&st.jht<=0)st.my=wy(st.w);
+        // Gravity: fall if not standing on a platform
+        if(!st.flg&&st.jht<=0){
+            const pw=onPlatform(st.mx,st.my+2);
+            if(pw>=0){st.w=pw;st.my=wy(pw);st.flg=0}
+            else{st.my+=2;st.flg=1}
+        }
 
     if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
 
@@ -391,60 +397,68 @@ function update(){
     }
 
     // === BARRELS ===
-        st.brs=Math.min(40,80-Math.floor(st.score/300)); // speed up as score increases
-        for(let i=st.obs.length-1;i>=0;i--){
-            const o=st.obs[i];
-            if(!o.a){st.obs.splice(i,1);continue}
-            if(o.s===1){ // roll state
-                o.x+=o.d*1.5;
-                const surf=ZIG[o.w];
-                if(o.w<4&&o.d>0&&o.x>=surf[1]){
-                    o.s=2;o.sc=0;
-                    o.ty=o.w+1;
-                    o.rc=3+Math.floor(Math.random()*3); // 3-5 frames per step
-                    o.ddx=-8;o.ddy=4;
-                    o.y+=4;
-                }else if(o.d<0 && o.x<=surf[0]){
-                    o.s=2;o.sc=0;
-                    o.ty=o.w+1;
-                    o.rc=3+Math.floor(Math.random()*3);
-                    o.ddx=8;o.ddy=4;
-                    o.y+=4;
+            st.brs=Math.min(40,80-Math.floor(st.score/300));
+            for(let i=st.obs.length-1;i>=0;i--){
+                const o=st.obs[i];
+                if(!o.a){st.obs.splice(i,1);continue}
+                if(o.s===1){ // roll state
+                    const spd=o.fb?3.0:2.5;
+                    o.x+=o.d*spd;
+                    const surf=ZIG[o.w];
+                    // W0 right edge → fall straight down to support band
+                    if(o.w===0&&o.d>0&&o.x>=surf[1]){
+                        o.y+=3;
+                        if(o.y>=wy(1)){o.y=wy(1);o.w=1;o.d=1}
+                    // Support band → ramp to W1 via right sweep
+                    }else if(o.w===1&&o.d>0&&o.x>=surf[1]){
+                        o.s=2;o.sc=0;o.ty=2;o.rc=0;
+                        o.ddx=-3;o.ddy=1; // right sweep: -3x,+1y per frame
+                        o.y+=2;
+                    // Other right-edge ramps (W2→W3)
+                    }else if(o.w>1&&o.w<5&&o.d>0&&o.x>=surf[1]){
+                        o.s=2;o.sc=0;o.ty=o.w+1;o.rc=0;
+                        o.ddx=-2;o.ddy=1;
+                        o.y+=2;
+                    // Left-edge ramps (W1→W2, W3→ground)
+                    }else if(o.w<5&&o.w>0&&o.d<0&&o.x<=surf[0]){
+                        o.s=2;o.sc=0;o.ty=o.w+1;o.rc=0;
+                        o.ddx=2;o.ddy=1;
+                        o.y+=2;
+                    }
+                }else if(o.s===2){ // ramp state — smooth diagonal
+                    o.sc++;
+                    if(o.sc>=o.rc){
+                        o.sc=0;
+                        o.x+=o.ddx;
+                        o.y+=o.ddy;
+                    }
+                    if(o.y>=wy(o.ty)){
+                        o.y=wy(o.ty);
+                        o.w=o.ty;
+                        o.s=1;
+                        if(o.ddx<0)o.d=-1;
+                        else o.d=1;
+                        const s=ZIG[o.w];
+                        if(o.x<s[0])o.x=s[0];
+                        if(o.x>s[1])o.x=s[1];
+                    }
+                    if(o.y>240)o.a=false;
+                }else if(o.s===3){ // falling from top
+                    o.y+=3;
+                    if(o.y>=wy(0)){
+                        o.y=wy(0);
+                        o.w=0;
+                        o.s=1;
+                        o.d=1;
+                    }
                 }
-            }else if(o.s===2){ // ramp bounce state
-                o.sc++;
-                if(o.sc>=o.rc){
-                    o.sc=0;
-                    o.x+=o.ddx;
-                    o.y+=o.ddy;
-                }
-                if(o.y>=wy(o.ty)){
-                    o.y=wy(o.ty);
-                    o.w=o.ty;
-                    o.s=1;
-                    if(o.ty===1||o.ty===3)o.d=-1;
-                    else o.d=1;
-                    const s=ZIG[o.w];
-                    if(o.x<s[0])o.x=s[0];
-                    if(o.x>s[1])o.x=s[1];
-                }
-                if(o.y>240)o.a=false;
-            }else if(o.s===3){ // falling from top
-                o.y+=3;
-                if(o.y>=wy(0)){
-                    o.y=wy(0);
-                    o.w=0;
-                    o.s=1;
-                    o.d=1;
-                }
+                if(o.x<0||o.x>320)o.a=false;
             }
-            if(o.x<0||o.x>320)o.a=false;
-        }
 
         st.ot++;
         if(st.ot%st.brs===0){
                     const act=st.obs.filter(o=>o.a&&o.s!==3);
-                    if(act.length<3)st.obs.push({x:35+Math.floor(Math.random()*15),y:-20,w:-1,d:0,s:3,a:true,ty:0,sc:0,rc:0,ddx:0,ddy:0,fb:Math.random()<0.1});
+                    if(act.length<4)st.obs.push({x:60+Math.floor(Math.random()*20),y:-20,w:-1,d:0,s:3,a:true,ty:0,sc:0,rc:0,ddx:0,ddy:0,fb:Math.random()<0.1});
                 }
 
     if(st.jht<=0){
@@ -453,7 +467,7 @@ function update(){
             if(Math.abs(st.mx-o.x)<6&&Math.abs(st.my-o.y)<12){
                 st.lives--;sD();
                 if(st.lives<=0){st.mode=1;st.got=0}
-                else{st.dcd=120;st.my=228;st.mx=160;st.w=4;st.md=-1;st.jht=0}
+                else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0}
                 return;
             }
         }
@@ -470,7 +484,7 @@ function drawAttract(){
     drawDK();
     drawGF();
     const marMX=160+Math.floor(Math.sin(st.fr/30)*60);
-    const marMY=wy(4)-16;
+    const marMY=wy(5)-16;
     dS(MARIO,marMX,marMY,R);
     cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
     cx.font='bold 20px monospace';
