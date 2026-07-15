@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Color Cluster Analysis</title>
+<style>body{background:#000;color:#0f0;font:12px monospace;margin:20px}
+pre{white-space:pre-wrap;word-break:break-all}</style>
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+const img=new Image();
+img.onload=()=>{
+  const c=document.createElement('canvas').getContext('2d');
+  c.canvas.width=320;c.canvas.height=240;
+  c.drawImage(img,0,0);
+  const d=c.getImageData(0,0,320,240).data;
+  
+  let out='';
+  
+  // For each walkway area, sample the colors
+  const areas=[
+    ['W0 surface (y=70-71, x=64-159)',70,71,64,159],
+    ['W0 edge posts (y=75-91, x=64-71)',75,91,64,71],
+    ['W0 edge posts right (y=75-91, x=152-159)',75,91,152,159],
+    ['W0 support band (y=95-99, x=64-239)',95,99,64,239],
+    ['W1 area (y=129-134, x=64-159)',129,134,64,159],
+    ['W1 area (y=129-134, x=64-207)',129,134,64,207],
+    ['W1 posts (y=127-143, x=96-103)',127,143,96,103],
+    ['W1 posts (y=127-143, x=136-143)',127,143,136,143],
+    ['W2 area (y=165-183, x=80-159)',165,183,80,159],
+    ['Ground (y=205-210, x=64-239)',205,210,64,239],
+    ['Ladder area top (y=75-90, x=72-95)',75,90,72,95],
+    ['Ladder area mid (y=95-115, x=104-123)',95,115,104,123],
+  ];
+  
+  for(let a of areas){
+    const [name,y1,y2,x1,x2]=a;
+    let colors={};
+    let count=0;
+    for(let y=y1;y<=y2;y++){
+      for(let x=x1;x<=x2;x++){
+        const i=(y*320+x)*4;
+        const r=d[i],g=d[i+1],b=d[i+2];
+        if(r<5&&g<5&&b<5)continue; // skip black
+        count++;
+        const key=Math.round(r/10)*10+','+Math.round(g/10)*10+','+Math.round(b/10)*10;
+        colors[key]=(colors[key]||0)+1;
+      }
+    }
+    // Sort by count
+    let sorted=Object.entries(colors).sort((a,b)=>b[1]-a[1]);
+    out+=name+': '+count+' total\n';
+    for(let i=0;i<Math.min(5,sorted.length);i++){
+      out+= '  rgb('+sorted[i][0]+'): '+sorted[i][1]+'px\n';
+    }
+    out+='\n';
+  }
+  
+  document.getElementById('out').textContent=out;
+};
+img.src='ref.gif?'+Date.now();
+</script>
+</body></html>

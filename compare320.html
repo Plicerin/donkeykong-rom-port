@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>Compare 320x240</title>
+<style>body{background:#000;color:#0f0;font:12px monospace;margin:20}
+canvas,img{display:none}pre{white-space:pre-wrap}</style></head>
+<body>
+<canvas id="r" width="320" height="240"></canvas>
+<canvas id="g" width="320" height="240"></canvas>
+<pre id="out"></pre>
+<script>
+const rc=document.getElementById('r').getContext('2d');
+const gc=document.getElementById('g').getContext('2d');
+const ref=new Image();
+ref.onload=()=>{
+  rc.drawImage(ref,0,0);
+  const r=rc.getImageData(0,0,320,240).data;
+  // Copy game canvas data into comparison canvas
+  gc.drawImage(document.getElementById('c'),0,0);
+  const g=gc.getImageData(0,0,320,240).data;
+  
+  let mismatches=[],totalBad=0,badRows=0;
+  for(let y=0;y<240;y++){
+    let rowBad=0;
+    for(let x=0;x<320;x++){
+      const i=(y*320+x)*4;
+      const rr=r[i],rg=r[i+1],rb=r[i+2],ra=r[i+3];
+      const gg=g[i],gr=g[i+1],gb=g[i+2],ga=g[i+3];
+      if(ra<128&&ga<128)continue;
+      if(Math.abs(rr-gg)>10||Math.abs(rg-gr)>10||Math.abs(rb-gb)>10){
+        rowBad++;
+      }
+    }
+    if(rowBad>0){
+      badRows++;
+      totalBad+=rowBad;
+    }
+  }
+  
+  document.getElementById('out').textContent=
+    'REFERENCE vs GAME COMPARISON (320x240)\n'+
+    'Platform color: rgb(189,102,175)\n'+
+    'Mismatch tolerance: 10 per channel\n'+
+    'Bad rows: '+badRows+'/'+240+'\n'+
+    'Bad pixels: '+totalBad+'/'+(320*240)+' ('+(totalBad*100/(320*240)).toFixed(2)+'%)\n\n'+
+    '=== ROW DETAIL ===\n';
+};
+ref.src='ref.gif?'+Date.now();
+</script>
+</body></html>

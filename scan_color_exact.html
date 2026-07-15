@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Exact Platform Colors</title>
+<style>body{background:#000;color:#0f0;font:12px monospace;margin:20px}
+pre{white-space:pre-wrap;word-break:break-all}</style>
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+const img=new Image();
+img.onload=()=>{
+  const c=document.createElement('canvas').getContext('2d');
+  c.canvas.width=320;c.canvas.height=240;
+  c.drawImage(img,0,0);
+  const d=c.getImageData(0,0,320,240).data;
+  
+  let out='';
+  
+  // Find the dominant "platform" color by scanning the support band
+  // Support band should be at y=85-90, x=64-239
+  let rSum=0,gSum=0,bSum=0,count=0;
+  for(let y=85;y<=90;y++){
+    for(let x=64;x<=239;x++){
+      const i=(y*320+x)*4;
+      if(d[i+3]>128&&!(d[i]<10&&d[i+1]<10&&d[i+2]<10)){
+        rSum+=d[i];gSum+=d[i+1];bSum+=d[i+2];count++;
+      }
+    }
+  }
+  out+='Support band avg color: rgb('+Math.round(rSum/count)+','+Math.round(gSum/count)+','+Math.round(bSum/count)+') ('+count+' pixels)\n';
+  
+  // Find all rows with platform-colored pixels (within tolerance of the support band color)
+  const pR=Math.round(rSum/count),pG=Math.round(gSum/count),pB=Math.round(bSum/count);
+  const tol=30;
+  
+  out+='\n=== PLATFORM STRUCTURE (color-based, tol='+tol+') ===\n';
+  for(let y=0;y<240;y++){
+    let cols=[];
+    let start=-1;
+    for(let x=0;x<320;x++){
+      const i=(y*320+x)*4;
+      const r=d[i],g=d[i+1],b=d[i+2];
+      if(Math.abs(r-pR)<tol&&Math.abs(g-pG)<tol&&Math.abs(b-pB)<tol){
+        if(start===-1)start=x;
+      }else{
+        if(start>=0){
+          cols.push(start+'-'+(x-1));
+          start=-1;
+        }
+      }
+    }
+    if(start>=0)cols.push(start+'-319');
+    if(cols.length>0){
+      out+=y+': ';
+      for(let ci=0;ci<cols.length;ci++){
+        if(ci>0)out+=',';
+        out+=cols[ci];
+      }
+      out+='\n';
+    }
+  }
+  
+  // Now extract LADDER pixels
+  out+='\n=== LADDER STRUCTURE (cyan pixels) ===\n';
+  for(let y=0;y<240;y++){
+    let cols=[];
+    let start=-1;
+    for(let x=0;x<320;x++){
+      const i=(y*320+x)*4;
+      const r=d[i],g=d[i+1],b=d[i+2];
+      if(g>200&&b>200&&r<80){
+        if(start===-1)start=x;
+      }else{
+        if(start>=0){
+          cols.push(start+'-'+(x-1));
+          start=-1;
+        }
+      }
+    }
+    if(start>=0)cols.push(start+'-319');
+    if(cols.length>0)out+=y+': '+cols.join(',')+'\n';
+  }
+  
+  document.getElementById('out').textContent=out;
+};
+img.src='ref.gif?'+Date.now();
+</script>
+</body></html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html><body><canvas id="c" width="320" height="240"></canvas>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+const img=new Image();
+img.onload=function(){
+    cx.drawImage(img,0,0,320,240);
+    const d=cx.getImageData(0,0,320,240).data;
+    let out='';
+    // PAL DK brown: r=189,g=102,b=175
+    // Also check nearby browns (dithering): accept r in [170-200], g in [90-120], b in [160-190]
+    function isBrown(i){
+        const r=d[i],g=d[i+1],b=d[i+2];
+        // Exact PAL brown
+        if(r===189&&g===102&&b===175)return true;
+        // Dithered band browns
+        if(r>=170&&r<=200&&g>=90&&g<=120&&b>=160&&b<=190)return true;
+        return false;
+    }
+    for(let y=0;y<240;y++){
+        let spans=[],s=-1;
+        for(let x=0;x<320;x++){
+            const i=(y*320+x)*4;
+            const br=isBrown(i);
+            if(br&&s<0)s=x;
+            if(!br&&s>=0){spans.push([s,x-1]);s=-1}
+        }
+        if(s>=0)spans.push([s,319]);
+        // Merge overlapping spans
+        let merged=[];
+        for(let sp of spans){
+            if(!merged.length){merged.push(sp);continue}
+            let last=merged[merged.length-1];
+            if(sp[0]<=last[1]+1)last[1]=Math.max(last[1],sp[1]);
+            else merged.push(sp);
+        }
+        if(merged.length){
+            // Only report rows with real platform data (not tiny sprite artifacts)
+            let total=0;
+            for(let m of merged)total+=m[1]-m[0]+1;
+            if(total>=5){
+                out+=y+':';
+                for(let m of merged)out+='['+m[0]+'-'+m[1]+':'+(m[1]-m[0]+1)+']';
+                out+='\n';
+            }
+        }
+    }
+    document.body.innerHTML='<pre>'+out+'</pre>';
+};
+img.src='ref.gif';
+</script></body></html>

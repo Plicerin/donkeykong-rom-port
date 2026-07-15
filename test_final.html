@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html><body style="background:#333">
+<canvas id="c" width="400" height="200"></canvas>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+cx.fillStyle='#333';cx.fillRect(0,0,400,200);
+
+// TEST A: y+r*sc (NO FLIP) - row 0 at top
+// Row 0 = narrow (3px), Row 18 = narrow (3px)
+const DK_ASM=[0xE0,0xE0,0x67,0x67,0x7E,0x7E,0x3E,0x5E,0xDC,0xBC,0xFE,0xFF,0x7F,0x39,0x45,0x7D,0x55,0x7C,0x38];
+
+function dA(sp,x,y,clr){
+    cx.font='7px monospace';
+    for(let r=0;r<sp.length;r++){
+        for(let c=0;c<8;c++){
+            if(sp[r]&(0x80>>c)){cx.fillStyle=clr;cx.fillRect(x+c*4,y+r*4,4,4);}
+        }
+        cx.fillStyle='#fff';cx.fillText(r,x+34,y+r*4+4);
+    }
+}
+
+function dB(sp,x,y,clr){
+    cx.font='7px monospace';
+    for(let r=0;r<sp.length;r++){
+        const dy=y+(sp.length-1-r)*4;
+        for(let c=0;c<8;c++){
+            if(sp[r]&(0x80>>c)){cx.fillStyle=clr;cx.fillRect(x+c*4,dy,4,4);}
+        }
+        cx.fillStyle='#fff';cx.fillText(r,x+34,dy+4);
+    }
+}
+
+cx.font='bold 10px monospace';
+cx.fillStyle='#0f0';cx.fillText('A: NO FLIP (row0 at TOP)',10,20);
+dA(DK_ASM,10,30,'#8B4513');
+cx.fillText('← shape: narrow top? wide middle? narrow bottom?',50,110);
+
+cx.fillStyle='#ff0';cx.fillText('B: FLIP (row0 at BOTTOM)',210,20);
+dB(DK_ASM,210,30,'#8B4513');
+cx.fillText('← shape: narrow top? wide middle? narrow bottom?',250,110);
+
+cx.fillStyle='#888';
+cx.fillText('ASM order: hat at index 0, feet at last index',10,190);
+</script></body></html>

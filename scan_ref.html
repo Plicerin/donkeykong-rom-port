@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html><body>
+<canvas id="c" width="320" height="240"></canvas>
+<pre id="out"></pre>
+<script>
+const c=document.getElementById('c'),ctx=c.getContext('2d');
+const img=new Image();
+img.onload=function(){
+    ctx.drawImage(img,0,0);
+    const out=[];
+    for(let y=50;y<200;y++){
+        let row='';
+        for(let x=0;x<320;x+=4){
+            const d=ctx.getImageData(x,y,1,1).data;
+            const isP=d[0]>170&&d[0]<210&&d[1]>90&&d[1]<120&&d[2]>160&&d[2]<190;
+            row+=isP?'#':'.';
+        }
+        if(row.includes('#'))out.push(y+': '+row);
+    }
+    document.getElementById('out').textContent=out.join('\n');
+    
+    // Also dump exact pixel positions for platform edges
+    const detail=[];
+    for(let y=50;y<200;y++){
+        const spans=[];
+        let start=-1;
+        for(let x=0;x<320;x++){
+            const d=ctx.getImageData(x,y,1,1).data;
+            const isP=d[0]>170&&d[0]<210&&d[1]>90&&d[1]<120&&d[2]>160&&d[2]<190;
+            if(isP&&start===-1){start=x}
+            else if(!isP&&start!==-1){spans.push(start+'-'+(x-1));start=-1}
+        }
+        if(start!==-1)spans.push(start+'-319');
+        if(spans.length>0)detail.push('y'+y+': '+spans.join(' '));
+    }
+    document.getElementById('out').textContent+= '\n\n=== DETAIL ===\n'+detail.join('\n');
+};
+img.src='ref.gif';
+</script>
+</body></html>

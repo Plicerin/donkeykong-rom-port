@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>W1 Surface Color</title>
+<style>body{background:#000;color:#0f0;font:12px monospace}</style></head>
+<body><pre id="out"></pre>
+<script>
+const img=new Image();
+img.onload=()=>{
+  const c=document.createElement('canvas').getContext('2d');
+  c.canvas.width=320;c.canvas.height=240;
+  c.drawImage(img,0,0);
+  const d=c.getImageData(0,0,320,240).data;
+  let out='';
+  // W1 surface: y=132, x=64-159
+  out+='=== y=132, x=64-159 ===\n';
+  for(let x=64;x<=159;x++){
+    const i=(132*320+x)*4;
+    out+=x+': rgb('+d[i]+','+d[i+1]+','+d[i+2]+')\n';
+  }
+  // Ground: y=228, x=64-255
+  out+='\n=== y=228, x=64-95 ===\n';
+  for(let x=64;x<=95;x++){
+    const i=(228*320+x)*4;
+    out+=x+': rgb('+d[i]+','+d[i+1]+','+d[i+2]+')\n';
+  }
+  document.getElementById('out').textContent=out;
+};
+img.src='ref.gif?'+Date.now();
+</script></body></html>

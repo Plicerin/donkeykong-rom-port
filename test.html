@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><body style="background:#222">
+<canvas id="c" width="400" height="200"></canvas>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+cx.fillStyle='black';cx.fillRect(0,0,400,200);
+
+// Test 1: draw 18 rows with unique colors, labeled 0-17
+cx.font='10px monospace';
+for(let y=0;y<18;y++){
+    const hue=y*20;
+    cx.fillStyle='hsl('+hue+',100%,50%)';
+    cx.fillRect(10,10+y*8,80,8);
+    cx.fillStyle='white';
+    cx.fillText('row '+y,95,19+y*8);
+}
+
+// Test 2: Draw DK sprite with each row a unique color, using y+r*sc pattern  
+const dk=[0xE0,0xE0,0x67,0x67,0x7E,0x7E,0x3E,0x5E,0xDC,0xBC,0xFE,0xFF,0x7F,0x39,0x45,0x7D,0x55,0x7C];
+const x=200,y=10,sc=2;
+for(let r=0;r<dk.length;r++){
+    const b=dk[r];
+    const hue=r*20;
+    for(let c=0;c<8;c++){
+        if(b&(0x80>>c)){
+            cx.fillStyle='hsl('+hue+',100%,50%)';
+            cx.fillRect(x+c*sc,y+r*sc,sc,sc);
+        }
+    }
+    cx.fillStyle='white';
+    cx.fillText(r,x+18,y+2+r*sc);
+}
+cx.fillStyle='yellow';
+cx.fillText('TOP of DK area (y)',x,8);
+cx.fillText('BOTTOM of DK area (y+34)',x,194);
+
+// Test 3: Draw DK sprite REVERSED, using same y+r*sc
+const rdk=[...dk].reverse();
+const x2=300;
+for(let r=0;r<rdk.length;r++){
+    const b=rdk[r];
+    const hue=r*20;
+    for(let c=0;c<8;c++){
+        if(b&(0x80>>c)){
+            cx.fillStyle='hsl('+hue+',100%,50%)';
+            cx.fillRect(x2+c*sc,y+r*sc,sc,sc);
+        }
+    }
+    cx.fillStyle='white';
+    cx.fillText(r,x2+18,y+2+r*sc);
+}
+cx.fillStyle='yellow';
+cx.fillText('REVERSED DK',x2,8);
+</script></body></html>

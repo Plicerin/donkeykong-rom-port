@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html><body>
+<canvas id="c" width="300" height="300" style="background:#000;image-rendering:pixelated"></canvas>
+<pre id="out" style="color:#0f0;background:#111;font:12px monospace;position:absolute;top:0;left:320px"></pre>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+function dR(x,y,w,h){cx.fillStyle='#fff';cx.fillRect(x,y,w,h)}
+function dS(sp,x,y,sc){
+ for(let r=0;r<sp.length;r++){
+  const b=sp[r];
+  for(let c=0;c<8;c++)if(b&(0x80>>c))dR(x+c*sc,y+r*sc,sc,sc);
+ }
+}
+function visualize(sp,label){
+ const rows=[];
+ for(let r=0;r<sp.length;r++){
+  const b=sp[r];
+  let line='';
+  for(let c=0;c<8;c++)line+=b&(0x80>>c)?'#':'.';
+  rows.push(r.toString().padStart(2,' ')+' |'+line+'| 0x'+sp[r].toString(16).padStart(2,'0'));
+ }
+ return label+'\n'+rows.join('\n')+'\n';
+}
+
+// ASM data (head-first: byte 0 = top/head)
+const DK_ASM=[0x00,0xE0,0xE0,0x67,0x67,0x7E,0x7E,0x3E,0x5E,0xDC,0xBC,0xFE,0xFF,0x7F,0x39,0x45,0x7D,0x55,0x7C,0x38];
+const GF_ASM=[0x00,0x43,0x82,0x7E,0x7F,0xFF,0x7E,0x3C,0x18,0x7E,0x38,0x9C,0x7E,0xBF,0x3A,0x1F,0x07,0x00,0x00,0x00];
+const M_ASM=[0x00,0x3F,0x1B,0x1B,0x3F,0x7B,0x75,0x76,0x7B,0x3F,0x1F,0x3E,0x0F,0xDB,0x6B,0x1A,0x7E,0x1C];
+
+// Render ASM order (index0=top) and reversed (indexN-1=top)
+dS(DK_ASM,10,5,2);
+dS(GF_ASM,35,5,2);
+dS(M_ASM,60,5,2);
+
+// Also render reversed
+const DK_RV=[...DK_ASM].reverse();
+const GF_RV=[...GF_ASM].reverse();
+const M_RV=[...M_ASM].reverse();
+dS(DK_RV,10,70,2);
+dS(GF_RV,35,70,2);
+dS(M_RV,60,70,2);
+
+let t='';
+t+='=== ASM ORDER (byte0=top scanline) ===\n';
+t+=visualize(DK_ASM,'DK_ASM');
+t+=visualize(GF_ASM,'GF_ASM');
+t+=visualize(M_ASM,'M_ASM');
+t+='\n=== REVERSED (byte0=bottom scanline, byteN-1=top) ===\n';
+t+=visualize(DK_RV,'DK_RV');
+t+=visualize(GF_RV,'GF_RV');
+t+=visualize(M_RV,'M_RV');
+t+='\nAtari 2600 kernel: lda DonkeyKong-1,x with x=20..1\n';
+t+='x=20 -> DK[19] (last byte) drawn on TOP scanline\n';
+t+='x=1 -> DK[0] drawn on BOTTOM scanline\n';
+t+='So 2600 DK top = $38 (3px), bottom = $00 (empty)\n';
+t+='This is FEET-FIRST = upside down on 2600!\n';
+t+='\nCanvas renders sp[0] at y+0 (top of sprite area)\n';
+t+='So canvas should use REVERSED data to match 2600\n';
+t+='REVERSED(byte0=bottom) => DK[0]=$38=feet at top on canvas\n';
+t+='=> This matches 2600 display: feet at top\n';
+t+='\nIf ORIGINAL ASM (byte0=top) is used on canvas:\n';
+t+='=> Head at top, feet at bottom = upright\n';
+t+='=> This is what humans expect to see\n';
+document.getElementById('out').textContent=t;
+</script>
+</body></html>

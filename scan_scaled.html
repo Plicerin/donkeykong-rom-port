@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html><body>
+<canvas id="ref" width="320" height="240"></canvas>
+<canvas id="game" width="320" height="240"></canvas>
+<pre id="analysis"></pre>
+<script>
+const img=new Image();
+img.onload=function(){
+    const refCtx=document.getElementById('ref').getContext('2d');
+    refCtx.drawImage(img,0,0);
+    
+    // Scale reference data to compare with game (which is 260px)
+    // To compare, create a 260px version
+    const gC=document.createElement('canvas');
+    gC.width=260; gC.height=200;
+    const gCtx=gC.getContext('2d');
+    gCtx.drawImage(img,0,0,260,200);
+    
+    // Analyze the 260px scaled version
+    const detail=[];
+    for(let y=50;y<190;y++){
+        const spans=[];
+        let start=-1;
+        for(let x=0;x<260;x++){
+            const d=gCtx.getImageData(x,y,1,1).data;
+            const isP=d[0]>170&&d[0]<210&&d[1]>90&&d[1]<120&&d[2]>160&&d[2]<190;
+            if(isP&&start===-1){start=x}
+            else if(!isP&&start!==-1){
+                if(x-1-start>=2)spans.push(start+'-'+(x-1));
+                start=-1;
+            }
+        }
+        if(start!==-1&&259-start>=2)spans.push(start+'-259');
+        if(spans.length>0)detail.push('y'+y+': '+spans.join(' '));
+    }
+    document.getElementById('analysis').textContent=detail.join('\n');
+};
+img.src='ref.gif';
+</script>
+</body></html>

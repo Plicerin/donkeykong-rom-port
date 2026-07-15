@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><body>
+<img id="ref" src="ref.gif">
+<pre id="log"></pre>
+<script>
+const img=document.getElementById('ref');
+img.onload=function(){
+    const c=document.createElement('canvas');
+    c.width=img.width; c.height=img.height;
+    const ctx=c.getContext('2d');
+    ctx.drawImage(img,0,0);
+    const out=[];
+    for(let y=0;y<img.height;y++){
+        let blocks='';
+        let inBlock=false;
+        for(let x=0;x<img.width;x++){
+            const d=ctx.getImageData(x,y,1,1).data;
+            const isP=d[0]>170&&d[0]<210&&d[1]>90&&d[1]<120&&d[2]>160&&d[2]<190;
+            if(isP) blocks+=inBlock?'':('['+x); else{if(inBlock)blocks+='-'+(x-1)+']';}inBlock=isP;
+        }
+        if(inBlock)blocks+='-'+(img.width-1)+']';
+        if(blocks)out.push(y+': '+blocks);
+    }
+    document.getElementById('log').textContent=out.join('\n');
+};
+</script>
+</body></html>

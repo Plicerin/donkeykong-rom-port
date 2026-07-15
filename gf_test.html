@@ -1,0 +1,49 @@
+<canvas id="c" width="500" height="400"></canvas>
+<script>
+const c=document.getElementById('c'),cx=c.getContext('2d');
+const sc=12;
+
+// GF data from ASM (20 bytes)
+const GF=[0x00,0x43,0x82,0x7E,0x7F,0xFF,0x7E,0x3C,0x18,0x7E,0x38,0x9C,0x7E,0xBF,0x3A,0x1F,0x07,0x00,0x00,0x00];
+const GF_RV=[...GF].reverse();
+
+const gc=[ [255,255,0],[255,255,0],[0,200,200],[0,200,200],[0,200,200],[0,200,200],[0,200,200],[200,50,50],[0,200,200],[0,200,200],[200,170,50],[200,170,50],[200,170,50],[200,170,50],[200,170,50],[200,170,50],[200,170,50],[200,170,50],[200,170,50],[200,170,50] ];
+const gc_RV=[...gc].reverse();
+
+function dS(sp,x,y,clrs){
+ for(let r=0;r<sp.length;r++){
+  const b=sp[r],cl=clrs[r];
+  for(let c=0;c<8;c++){
+   if(b&(0x80>>c)){
+    cx.fillStyle=`rgb(${cl[0]},${cl[1]},${cl[2]})`;
+    cx.fillRect(x+c*sc,y+r*sc,sc,sc);
+   }
+  }
+ }
+}
+
+// Panel 1: ASM order (current) - head at top if head-first
+cx.fillStyle='#fff';
+cx.font='10px monospace';
+cx.fillText('ASM ORDER (current - head-first?)',10,14);
+dS(GF,10,20,gc);
+
+// Panel 2: Reversed (feet-first like DK)
+cx.fillText('REVERSED (feet-first like DK)',160,14);
+dS(GF_RV,160,20,gc_RV);
+
+// Draw row labels
+cx.fillStyle='#666';
+for(let r=0;r<20;r++){
+ cx.fillText(r+':0x'+GF[r].toString(16).padStart(2,'0'),270,34+r*12);
+ cx.fillText(r+':0x'+GF_RV[r].toString(16).padStart(2,'0'),370,34+r*12);
+}
+
+// Label
+cx.fillStyle='#0f0';
+cx.font='bold 11px monospace';
+cx.fillText('PANEL 1 (ASM order/current)',10,302);
+cx.fillText('PANEL 2 (REVERSED = DK style)',160,302);
+cx.fillStyle='#ff0';
+cx.fillText('Which matches reference picture?',10,320);
+</script></canvas>

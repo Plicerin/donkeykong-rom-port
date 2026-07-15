@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html><body>
+<canvas id="c"></canvas>
+<pre id="out"></pre>
+<script>
+const img = new Image();
+img.onload = function(){
+  const c = document.getElementById('c');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img,0,0);
+  const w=img.width, h=img.height;
+  let out='';
+  
+  // Scan every row - only purple pixels
+  // Group continuous rows into platforms
+  let prevEnd=-1, prevL=-1, prevR=-1, platCount=0;
+  let platform=true;
+  
+  for(let y=0;y<h;y++){
+    let l=9999,r=0;
+    for(let x=0;x<w;x++){
+      const d=ctx.getImageData(x,y,1,1).data;
+      if(Math.abs(d[0]-189)<20 && Math.abs(d[1]-102)<20 && Math.abs(d[2]-175)<20){
+        if(x<l)l=x;
+        if(x>r)r=x;
+      }
+    }
+    if(l<9999){
+      if(y>prevEnd+3 && prevEnd>=0){
+        out+='\n--- GAP '+(y-prevEnd)+' rows ---\n';
+      }
+      out+='y'+y+': L='+l+' R='+r+' W='+(r-l+1);
+      // Detect if notch row (only ~8px wide) vs full width
+      if(r-l+1 < 20) out+=' NOTCH';
+      out+='\n';
+      prevEnd=y; prevL=l; prevR=r;
+    }
+  }
+  
+  document.getElementById('out').textContent = out;
+};
+img.src = 'ref.gif';
+</script>
+</body></html>

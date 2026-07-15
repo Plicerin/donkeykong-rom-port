@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><body><canvas id="c" width="320" height="240"></canvas>
+<pre id="out" style="background:#000;color:#0f0;font:10px monospace;padding:5px"></pre>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+const img=new Image();
+img.onload=function(){
+    cx.drawImage(img,0,0,320,240);
+    const d=cx.getImageData(0,0,320,240).data;
+    let out='';
+    for(let y=50;y<230;y++){
+        let row='';
+        for(let x=0;x<320;x+=4){
+            const i=(y*320+x)*4;
+            const r=d[i],g=d[i+1],b=d[i+2];
+            // Check for ANY non-black structural pixel
+            // DK platforms use brown/cream, sprites use various colors
+            // We want: r>20 || g>20 || b>20
+            const isStr = (r>20||g>20||b>20);
+            row+=isStr?'█':'░';
+        }
+        out+=('  '+y).slice(-3)+'|'+row+'\n';
+    }
+    document.getElementById('out').textContent=out;
+};
+img.src='ref.gif';
+</script></body></html>

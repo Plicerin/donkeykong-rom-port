@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html><body style="background:#222">
+<canvas id="c" width="500" height="200"></canvas>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+
+// DK data from ASM (19 visible rows in comment order: hat at top, feet at bottom)
+const DK_SRC=[0x00,0xE0,0xE0,0x67,0x67,0x7E,0x7E,0x3E,0x5E,0xDC,0xBC,0xFE,0xFF,0x7F,0x39,0x45,0x7D,0x55,0x7C,0x38];
+// DK[1]..DK[19] = visible rows (19 rows)
+const DK_VISIBLE=DK_SRC.slice(1); // 19 elements
+
+function drawSprite(sp,x,y,sc,label){
+    for(let r=0;r<sp.length;r++){
+        const b=sp[r];
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c)){
+                const hue=Math.floor(r*360/sp.length);
+                cx.fillStyle='hsl('+hue+',80%,50%)';
+                cx.fillRect(x+c*sc,y+r*sc,sc,sc);
+            }
+        }
+        // row label
+        cx.fillStyle='#fff';
+        cx.font='9px monospace';
+        cx.fillText(r,x+8*sc+4,y+sc*(r+1)-2);
+    }
+    // label
+    cx.fillStyle='#ff0';
+    cx.font='bold 10px monospace';
+    cx.fillText(label,x,8);
+}
+
+// Test A: ASM order (DK[1]..DK[19]), y+r*sc (no flip) = ROW 0 AT TOP
+drawSprite(DK_VISIBLE,10,30,2,'A: ASM order, no flip (row0=hat at TOP)');
+
+// Test B: Reversed order (DK[19]..DK[1]), y+r*sc (no flip) = ROW 0 AT TOP
+const DK_REV=[...DK_VISIBLE].reverse();
+drawSprite(DK_REV,160,30,2,'B: REV order, no flip (row0=feet at TOP)');
+
+// Test C: ASM order, y+(len-1-r)*sc (flip) = ROW N-1 AT TOP
+function drawSpriteFlip(sp,x,y,sc,label){
+    for(let r=0;r<sp.length;r++){
+        const b=sp[r];
+        const dy=y+(sp.length-1-r)*sc;
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c)){
+                const hue=Math.floor(r*360/sp.length);
+                cx.fillStyle='hsl('+hue+',80%,50%)';
+                cx.fillRect(x+c*sc,dy,sc,sc);
+            }
+        }
+        cx.fillStyle='#fff';
+        cx.font='9px monospace';
+        cx.fillText(r,x+8*sc+4,dy+sc);
+    }
+    cx.fillStyle='#0f0';
+    cx.font='bold 10px monospace';
+    cx.fillText(label,x,8);
+}
+drawSpriteFlip(DK_VISIBLE,310,30,2,'C: ASM order, FLIP (row17=hat at TOP)');
+
+// Check which matches DK's known shape: hat at top, body in middle, feet at bottom
+// Also draw the raw ASM comments
+cx.fillStyle='#888';
+cx.font='8px monospace';
+cx.fillText('ASM DK[1]=0xE0=hat, DK[19]=0x38=feet',10,190);
+</script>
+</body></html>

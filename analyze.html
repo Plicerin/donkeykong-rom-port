@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html><body>
+<canvas id="c"></canvas>
+<script>
+const img = new Image();
+img.onload = function(){
+  const c = document.getElementById('c');
+  c.width = img.width;
+  c.height = img.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img,0,0);
+  const w=img.width, h=img.height;
+  let out='';
+  // Find platform rows (purple/magenta ~189,102,175)
+  for(let y=0;y<h;y++){
+    let l=9999,r=0;
+    for(let x=0;x<w;x++){
+      const d=ctx.getImageData(x,y,1,1).data;
+      if(Math.abs(d[0]-189)<20 && Math.abs(d[1]-102)<20 && Math.abs(d[2]-175)<20){
+        if(x<l)l=x;
+        if(x>r)r=x;
+      }
+    }
+    if(l<9999) out+=y+','+l+','+r+';';
+  }
+  document.body.innerText = out;
+};
+img.src = 'ref.gif';
+</script>
+</body></html>

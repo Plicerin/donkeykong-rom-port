@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Reference Scan</title></head>
+<body>
+<canvas id="r" width="320" height="240"></canvas>
+<canvas id="g" width="260" height="155"></canvas>
+<pre id="out"></pre>
+<script>
+const img=new Image();
+img.onload=()=>{
+  // Draw reference at native 320x240
+  const rc=document.getElementById('r').getContext('2d');
+  rc.drawImage(img,0,0,320,240);
+  const rd=rc.getImageData(0,0,320,240).data;
+  
+  // Scan every row for platform-like pixels
+  let out='';
+  for(let y=0;y<240;y++){
+    let cols=[];
+    let lastStart=-1;
+    for(let x=0;x<320;x++){
+      const i=(y*320+x)*4;
+      const r=rd[i],g=rd[i+1],b=rd[i+2],a=rd[i+3];
+      // Not black
+      if(!(r<5&&g<5&&b<5)){
+        if(lastStart===-1)lastStart=x;
+      }else{
+        if(lastStart>=0){
+          cols.push('['+lastStart+'-'+(x-1)+']');
+          lastStart=-1;
+        }
+      }
+    }
+    if(lastStart>=0)cols.push('['+lastStart+'-319]');
+    if(cols.length>0)out+=y+': '+cols.join(',')+'\n';
+  }
+  
+  // Check specific pixel colors at key positions
+  out+='\n=== SPOT CHECKS ===\n';
+  const spots=[[55,10],[70,10],[90,10],[110,10],[130,10],[150,10],[170,10],[190,10],[210,10]];
+  for(let s of spots){
+    const i=(s[1]*320+s[0])*4;
+    out+='('+s[0]+','+s[1]+'): rgb('+rd[i]+','+rd[i+1]+','+rd[i+2]+')\n';
+  }
+  
+  // Check platform surface closely
+  out+='\n=== W0 SURFACE (y=58-70) ===\n';
+  for(let y=58;y<=70;y++){
+    let span='';
+    for(let x=50;x<200;x++){
+      const i=(y*320+x)*4;
+      if(rd[i+3]>128&&!(rd[i]<5&&rd[i+1]<5&&rd[i+2]<5)){
+        span+='X';
+      }else{
+        span+='.';
+      }
+    }
+    out+=y+': '+span+'\n';
+  }
+  
+  out+='\n=== LADDER AREA (x=70-110, y=58-100) ===\n';
+  for(let y=58;y<=100;y++){
+  let row='';
+  for(let x=70;x<=110;x++){
+    const i=(y*320+x)*4;
+    const r=rd[i],g=rd[i+1],b=rd[i+2];
+    if(!(r<5&&g<5&&b<5)){
+      if(g>200&&b>200&&r<50)row+='C'; // cyan
+      else if(r>120&&g<100&&b>100)row+='P'; // purple/brown
+      else row+='X';
+    }else row+='.';
+  }
+  out+=y+': '+row+'\n';
+  }
+  
+  document.getElementById('out').textContent=out;
+};
+img.src='ref.gif?'+Date.now();
+</script>
+</body></html>

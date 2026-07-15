@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html><body style="background:#000;color:#0f0;font:11px/10px monospace">
+<pre id="out"></pre>
+<script>
+const cv=document.createElement('canvas');
+cv.width=320;cv.height=240;
+const cx=cv.getContext('2d');
+const img=new Image();
+img.onload=function(){
+    cx.drawImage(img,0,0,320,240);
+    const d=cx.getImageData(0,0,320,240).data;
+    let out='';
+    for(let y=50;y<210;y++){
+        out+=('  '+y).slice(-3)+': ';
+        let count=0;
+        let spans=[],s=-1;
+        for(let x=0;x<320;x++){
+            const i=(y*320+x)*4;
+            const r=d[i],g=d[i+1],b=d[i+2];
+            if(r>15||g>15||b>15){
+                count++;
+                if(s<0)s=x;
+            }else{
+                if(s>=0){spans.push(s+'-'+(x-1)+':'+(x-s));s=-1}
+            }
+        }
+        if(s>=0)spans.push(s+'-319:'+(320-s));
+        if(count>3){
+            out+=count+'px ';
+            for(let sp of spans.slice(0,12))out+=sp+' ';
+            if(spans.length>12)out+='...';
+            out+='\n';
+        }
+    }
+    document.getElementById('out').textContent=out;
+};
+img.src='ref.gif';
+</script></body></html>

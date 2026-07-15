@@ -1,0 +1,87 @@
+<canvas id="c" width="256" height="320" style="background:#000"></canvas>
+<pre id="log" style="color:#fff;background:#111;font:12px monospace;position:absolute;top:10px;left:300px"></pre>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+const log=document.getElementById('log');
+
+// Colors
+const R=[255,0,0], BR=[139,69,19], O=[255,165,0], BL=[0,0,255];
+const YL=[255,255,0], TQ=[0,255,255], SR=[255,100,100];
+
+function dR(x,y,w,h,c){cx.fillStyle='rgb('+c[0]+','+c[1]+','+c[2]+')';cx.fillRect(x,y,w,h)}
+
+function dS(sp,x,y,sc,clr,label){
+    for(let r=0;r<sp.length;r++){
+        const b=sp[r];
+        // Draw row number
+        cx.fillStyle='#666';
+        cx.fillText(r, x-20, y+r*sc+sc);
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c))dR(x+c*sc,y+r*sc,sc,sc,clr);
+        }
+    }
+    cx.fillStyle='#aaa';
+    cx.fillText(label||'', x, y-5);
+}
+
+// --- ASM DATA (as stored in ROM, index 0 = first byte) ---
+// DK sprite (20 bytes) PLAYER_HEIGHT=20, rendering loads DK[19] first (top)
+const DK_ASM=[0x00,0xE0,0xE0,0x67,0x67,0x7E,0x7E,0x3E,0x5E,0xDC,0xBC,0xFE,0xFF,0x7F,0x39,0x45,0x7D,0x55,0x7C,0x38];
+// Reverse for canvas: first row drawn = top of sprite = DK[19]
+const DK_CANVAS=[...DK_ASM].reverse();
+
+// GF sprite (20 bytes)
+const GF_ASM=[0x00,0x43,0x82,0x7E,0x7F,0xFF,0x7E,0x3C,0x18,0x7E,0x38,0x9C,0x7E,0xBF,0x3A,0x1F,0x07,0x00,0x00,0x00];
+const GF_CANVAS=[...GF_ASM].reverse();
+
+// Mario sprite (18 bytes, StationaryMarioSprite)
+const M_ASM=[0x00,0x3F,0x1B,0x1B,0x3F,0x7B,0x75,0x76,0x7B,0x3F,0x1F,0x3E,0x0F,0xDB,0x6B,0x1A,0x7E,0x1C];
+const M_CANVAS=[...M_ASM].reverse();
+
+// Also try IN-ORDER rendering (first array byte on top scanline)
+// This is how the canvas currently works
+
+// Top row: ASM-order (as-is, index 0 on top)
+let y=20;
+cx.font='10px monospace';
+cx.fillStyle='#fff';
+cx.fillText("=== ASM ORDER (index 0 = top scanline) ===", 10, y);
+y+=20;
+dS(DK_ASM, 10, y, 2, BR, "DK_ASM");
+dS(GF_ASM, 120, y, 2, YL, "GF_ASM");
+dS(M_ASM, 200, y, 2, R, "M_ASM");
+
+y+=60;
+cx.fillStyle='#fff';
+cx.fillText("=== CANVAS ORDER (reversed: index 0 = top of sprite display) ===", 10, y);
+y+=20;
+dS(DK_CANVAS, 10, y, 2, BR, "DK_CANVAS");
+dS(GF_CANVAS, 120, y, 2, YL, "GF_CANVAS");
+dS(M_CANVAS, 200, y, 2, R, "M_CANVAS");
+
+// What's actually IN game.html right now
+const DK_HTML=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0];
+const GF_HTML=[0x00,0x00,0x00,0x07,0x1F,0x3A,0xBF,0x7E,0x9C,0x38,0x7E,0x18,0x3C,0x7E,0xFF,0x7F,0x7E,0x82,0x43,0x00];
+const M_HTML=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0x1F,0x3F,0x7B,0x76,0x75,0x7B,0x3F,0x1B,0x1B,0x3F,0x00];
+
+y+=60;
+cx.fillStyle='#fff';
+cx.fillText("=== CURRENT HTML (what's in game.html) ===", 10, y);
+y+=20;
+dS(DK_HTML, 10, y, 2, BR, "DK_HTML");
+dS(GF_HTML, 120, y, 2, YL, "GF_HTML");
+dS(M_HTML, 200, y, 2, R, "M_HTML");
+
+log.innerHTML = 
+  "DK_ASM:    " + DK_ASM.map(b=>'$'+b.toString(16).padStart(2,'0')).join(',') + "\n\n" +
+  "DK_CANVAS: " + DK_CANVAS.map(b=>'$'+b.toString(16).padStart(2,'0')).join(',') + "\n\n" +
+  "DK_HTML:   " + DK_HTML.map(b=>'$'+b.toString(16).padStart(2,'0')).join(',') + "\n\n" +
+  "DK_ASM == DK_CANVAS reversed: " + (JSON.stringify(DK_ASM) === JSON.stringify([...DK_CANVAS].reverse())) + "\n" +
+  "DK_HTML == DK_CANVAS: " + (JSON.stringify(DK_HTML) === JSON.stringify(DK_CANVAS)) + "\n" +
+  "(DK_ASM[19]=$38=top of sprite, DK_ASM[0]=$00=bottom)" + "\n\n" +
+  "M_ASM:     " + M_ASM.map(b=>'$'+b.toString(16).padStart(2,'0')).join(',') + "\n\n" +
+  "M_CANVAS:  " + M_CANVAS.map(b=>'$'+b.toString(16).padStart(2,'0')).join(',') + "\n\n" +
+  "M_HTML:    " + M_HTML.map(b=>'$'+b.toString(16).padStart(2,'0')).join(',') + "\n\n" +
+  "M_CANVAS length:" + M_CANVAS.length + " M_HTML length:" + M_HTML.length + "\n" +
+  "M_HTML == M_CANVAS: " + (JSON.stringify(M_HTML) === JSON.stringify(M_CANVAS));
+</script>

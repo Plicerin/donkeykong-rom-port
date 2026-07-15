@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Pixel Perfect Compare</title>
+<style>body{background:#000;color:#0f0;font:12px monospace;margin:20px}
+canvas{border:1px solid #333;display:inline-block;vertical-align:top}
+#diff{border:1px solid #f00}</style>
+</head>
+<body>
+<div>
+  <canvas id="ref" width="260" height="155"></canvas>
+  <canvas id="game" width="260" height="155"></canvas>
+  <canvas id="diff" width="260" height="155"></canvas>
+</div>
+<pre id="log"></pre>
+<script>
+const refC=document.getElementById('ref').getContext('2d');
+const gameC=document.getElementById('game').getContext('2d');
+const diffC=document.getElementById('diff').getContext('2d');
+const log=document.getElementById('log');
+
+const img=new Image();
+img.onload=()=>{
+  // Scale reference to 260x155
+  refC.drawImage(img,0,0,260,155);
+  const refD=refC.getImageData(0,0,260,155).data;
+  
+  // Now compare with game's render
+  // First draw the game
+  const gc=gameC;
+  
+  // PAL colors
+  const P=[
+    [0,0,0],[255,255,255],[180,60,0],[200,170,50],[120,40,120],
+    [180,50,50],[200,40,40],[189,102,175],[180,160,30],[0,70,170],
+    [0,200,200],[30,130,130],[160,230,60]];
+  const B=P[0],W=P[1],O=P[2],BLN=P[3],PU=P[4],SR=P[5],R=P[6],BR=P[7],YL=P[8],BL=P[9],TQ=P[10],BG=P[11],LG=P[12];
+  
+  const WY=[41,72,92,108,132];
+  function wy(w){return WY[w]}
+  
+  // Platform data from reference
+  const PLAT_DATA = {
+    41: [[52,130]],
+    43: [[52,58],[124,130]],
+    44: [[52,58],[124,130]],
+    46: [[52,58],[124,130]],
+    48: [[52,58],[124,130]],
+    50: [[52,58],[124,130]],
+    51: [[52,58],[124,130]],
+    53: [[52,58],[124,130]],
+    55: [[52,195]],
+    56: [[52,195]],
+    57: [[52,195]],
+    58: [[52,195]],
+  };
+  
+  gc.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
+  gc.fillRect(0,0,260,155);
+  
+  for(let y in PLAT_DATA){
+    const spans=PLAT_DATA[y];
+    const yy=parseInt(y);
+    for(let sp of spans){
+      gc.fillStyle='rgb('+BR[0]+','+BR[1]+','+BR[2]+')';
+      gc.fillRect(sp[0],yy,sp[1]-sp[0]+1,1);
+    }
+  }
+  
+  const gameD=gc.getImageData(0,0,260,155).data;
+  
+  // Diff
+  let mismatch=0,total=0;
+  const diffD=diffC.createImageData(260,155);
+  for(let i=0;i<refD.length;i+=4){
+    const dr=refD[i],dg=refD[i+1],db=refD[i+2];
+    const gr=gameD[i],gg=gameD[i+1],gb=gameD[i+2];
+    total++;
+    const match=Math.abs(dr-gr)<20&&Math.abs(dg-gg)<20&&Math.abs(db-gb)<20;
+    if(match){
+      diffD.data[i]=0;diffD.data[i+1]=255;diffD.data[i+2]=0;diffD.data[i+3]=255;
+    }else{
+      diffD.data[i]=255;diffD.data[i+1]=0;diffD.data[i+2]=0;diffD.data[i+3]=255;
+      mismatch++;
+    }
+  }
+  diffC.putImageData(diffD,0,0);
+  
+  log.textContent='Mismatch: '+mismatch+'/'+total+' pixels ('+((mismatch/total)*100).toFixed(2)+'%)\n\n';
+  
+  // Find rows with most mismatches
+  let rowCounts=[];
+  for(let y=0;y<155;y++){
+    let bad=0;
+    for(let x=0;x<260;x++){
+      const i=(y*260+x)*4;
+      if(diffD.data[i]!==0)bad++;
+    }
+    rowCounts.push({y,bad});
+  }
+  rowCounts.sort((a,b)=>b.bad-a.bad);
+  for(let i=0;i<20;i++){
+    log.textContent+='Row '+rowCounts[i].y+': '+rowCounts[i].bad+' bad pixels\n';
+  }
+};
+img.src='ref.gif?'+Date.now();
+</script>
+</body></html>

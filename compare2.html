@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html><body style="margin:0;background:#111;color:#fff;font-family:monospace;">
+<div style="display:flex;flex-wrap:wrap;gap:10px;padding:10px">
+<div>
+<h3>REFERENCE</h3>
+<canvas id="rc" width="320" height="240" style="image-rendering:pixelated;width:320px;height:240px;border:1px solid #555"></canvas>
+</div>
+<div>
+<h3>GAME (scaled)</h3>
+<canvas id="gc" width="260" height="155" style="image-rendering:pixelated;width:260px;height:195px;border:1px solid #555"></canvas>
+</div>
+</div>
+<pre id="info" style="color:#aaa;padding:10px"></pre>
+<script>
+const rc=document.getElementById('rc'),rx=rc.getContext('2d');
+const gc=document.getElementById('gc'),gx=gc.getContext('2d');
+
+const BR=[80,40,0],B=[0,0,0];
+const PLAT_DATA=[
+[45,[[52,129]]],[46,[[52,129]]],
+[48,[[52,58],[124,129]]],[51,[[52,58],[124,129]]],[53,[[52,58],[124,129]]],[56,[[52,58],[124,129]]],[59,[[52,58],[124,129]]],
+[61,[[52,194]]],[62,[[52,194]]],
+[63,[[52,58],[65,77],[84,97],[104,116],[124,136],[143,155],[162,175],[182,194]]],
+[64,[[52,194]]],
+[66,[[124,129],[176,181]]],[67,[[94,100]]],[68,[[94,100]]],
+[69,[[176,181]]],[71,[[176,181]]],[74,[[124,129],[176,181]]],
+[75,[[169,207]]],[76,[[150,175],[182,188],[195,201]]],
+[77,[[110,207]]],[78,[[91,116],[124,129],[136,142],[150,155],[162,188]]],
+[79,[[65,168]]],[80,[[65,71],[78,84],[91,97],[104,129]]],
+[81,[[65,110]]],[82,[[65,71],[78,84],[110,116],[162,168]]],
+[84,[[78,84],[110,116]]],[87,[[78,84],[110,116]]],
+[90,[[78,84],[110,116],[162,168]]],[92,[[78,84],[110,116],[162,168]]],
+[93,[[52,90]]],[94,[[58,64],[72,77],[84,110]]],
+[95,[[52,149],[162,168]]],[96,[[72,97],[104,110],[117,123],[130,136],[143,168]]],
+[97,[[91,194]]],[98,[[130,155],[162,168],[176,181],[188,194]]],
+[99,[[150,194]]],[100,[[104,110],[143,149],[176,181],[188,194]]],
+[102,[[143,149],[176,181]]],[105,[[143,149],[176,181]]],
+[108,[[104,110],[143,149],[177,178]]],[110,[[104,110],[143,149],[179,180]]],
+[111,[[188,207]]],[112,[[150,207]]],[113,[[104,207]]],
+[114,[[91,116],[124,129],[136,142],[150,155],[162,188]]],
+[115,[[65,168]]],[116,[[65,71],[78,84],[91,97],[104,129]]],
+[117,[[65,110]]],[118,[[65,71],[78,84],[130,136]]],
+[121,[[78,84],[130,136]]],[123,[[78,84],[130,136]]],
+[126,[[78,84],[130,136]]],[128,[[78,84],[130,134]]],
+[129,[[52,71]]],[130,[[52,110]]],
+[131,[[52,58],[65,71],[78,84],[91,97],[104,136]]],
+[132,[[52,168]]],[133,[[91,194]]],
+[134,[[130,155],[162,168],[176,181],[188,194]]],
+[135,[[150,194]]],[136,[[117,123],[176,181],[188,194]]],
+[139,[[58,71],[176,181]]],[141,[[58,71],[176,181]]],
+[142,[[58,71]]],[143,[[58,71]]],
+[144,[[58,71],[117,123],[176,181]]],[146,[[58,71],[117,123],[176,181]]],
+[147,[[52,207]]],[148,[[52,207]]]
+];
+function dR(c,x,y,w,h){c.fillStyle='rgb('+BR[0]+','+BR[1]+','+BR[2]+')';c.fillRect(x,y,w,h)}
+function drawPlats(){
+    gx.fillStyle='rgb(0,0,0)';gx.fillRect(0,0,260,155);
+    for(const[y,spans]of PLAT_DATA){for(const[x1,x2]of spans)dR(gx,x1,y,x2-x1+1,1)}
+    dR(gx,20,150,220,3); // ground
+}
+drawPlats();
+
+const img=new Image();
+img.onload=function(){
+    rx.drawImage(img,0,0,320,240);
+    let info='REFERENCE pixel scan at y=64 (W0 surface):\n';
+    const d=rx.getImageData(0,0,320,240).data;
+    // Full scan of reference, find ALL walkways
+    // For each y, find contiguous brown spans
+    let brown={};
+    for(let y=0;y<240;y++){
+        let c=0,spans=[],s=-1;
+        for(let x=0;x<320;x++){
+            const i=(y*320+x)*4;
+            const r=d[i],g=d[i+1],b=d[i+2];
+            // Check for DK brown (PAL: 189,102,175) or similar platform colors
+            const isBr=(r===189&&g===102&&b===175)||(r>100&&r<210&&g>60&&g<130&&b>100&&b<210);
+            if(isBr&&s<0)s=x;
+            if(isBr)c++;
+            if(!isBr&&s>=0){spans.push(s+'-'+(x-1));s=-1}
+            if(x===319&&s>=0){spans.push(s+'-'+x);s=-1}
+        }
+        if(c>4){ // Significant brown content
+            let sStr=spans.join(',');
+            brown[y]={count:c,spans:sStr};
+        }
+    }
+    // Print 10 rows with most brown
+    let sorted=Object.entries(brown).sort((a,b)=>b[1].count-a[1].count);
+    info+='Top 30 brown rows in reference:\n';
+    for(let i=0;i<30&&i<sorted.length;i++){
+        info+=`y=${sorted[i][0]}: ${sorted[i][1].count}px [${sorted[i][1].spans}]\n`;
+    }
+    document.getElementById('info').textContent=info;
+};
+img.src='ref.gif';
+</script></body></html>
