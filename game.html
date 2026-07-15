@@ -430,11 +430,11 @@ function update(){
                                     // Walkway edge → enter falling state (ASM ladder equivalent)
                                     const surf=ZIG[o.w];
                                     if(o.d>0&&o.x>=surf[1]){
-                                        if(o.w===5){o.a=false;continue}
+                                        if(o.w===5){o.a=false;st.score+=100;continue}
                                         o.ty=Math.min(o.w+1,5);
                                         o.s=2;
                                     }else if(o.d<0&&o.x<=surf[0]){
-                                        if(o.w===5){o.a=false;continue}
+                                        if(o.w===5){o.a=false;st.score+=100;continue}
                                         o.ty=Math.min(o.w+1,5);
                                         o.s=2;
                                     }
@@ -449,11 +449,11 @@ function update(){
                                         o.s=1;
                                         o.d=-o.d; // ASM: eor #$F1 → toggle direction
                                     }
-                                    if(o.y>240)o.a=false;
+                                    if(o.y>240){o.a=false;st.score+=100}
                                 }
 
-                                if(o.w===5&&o.x<92)o.a=false;
-                                if(o.x<0||o.x>320)o.a=false;
+                                if(o.w===5&&o.x<92){o.a=false;st.score+=100}
+                                if(o.x<0||o.x>320){o.a=false;st.score+=100}
                             }
 
                 st.ot++;
