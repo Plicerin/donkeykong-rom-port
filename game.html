@@ -410,69 +410,75 @@ function update(){
     }
 
     // === BARRELS (ASM-exact) ===
-                            // ASM constants: ROLL_SPEED=1, FALL_SPEED=2
-                            // RampHorizValues = $2D,$3A,$45,$51,$5D,$69,$75 (45,58,69,81,93,105,117)
-                            // Mapped to canvas 320px → ASM x-range 36-124 (scale=320/128=2.5):
+                            // ASM: RampHorizValues = $2D..$75 (45,58,69,81,93,105,117)
+                            // 2600 x [36,124] → canvas [90,310], scale=2.5
                             const RAMP_X=[112,145,173,203,233,263,293];
-                            const RAMP_LEFT=[44,77,105,135,165,195,225]; // mirrored for left-moving barrels
+                            const RAMP_L=[44,77,105,135,165,195,225];
+                            // ASM LadderHorizValues per walkway (canvas): barrels find a ladder X to descend VERTICALLY
+                            const LADDER_X=[[273,308],[123,203,88,308],[223,273,88,308],[123,163,173,183],[253,273],[193]];
+                            // Walkway boundaries (barrel full x-range, ASM XMIN=$24 XMAX=$7C)
+                            const BARREL_LB=[92,90,90,90,92,92];
+                            const BARREL_RB=[320,310,310,310,310,310];
 
                             st.brs=Math.min(40,80-Math.floor(st.score/300));
                             for(let i=st.obs.length-1;i>=0;i--){
                                 const o=st.obs[i];
                                 if(!o.a){st.obs.splice(i,1);continue}
-
-                                // ASM: roll at 1 px/frame (fire barrel = 2)
                                 const spd=o.fb?2:1;
 
-                                if(o.s===1){ // ROLLING state
-                                    o.x+=o.d*spd;
+                                if(o.s===1){ // ROLLING — ASM: direction & $80 == 0
+                                    o.x+=o.d*spd; // ASM: inc/dec horPosP1,x
 
-                                    // ASM ramp staircase: at 7 fixed x positions, y+=1 on walkways 1-4
+                                    // ASM BarrelRampMovement: at 7 ramp x positions, y+=1 (non-top, non-bottom)
                                     if(o.w>=1&&o.w<=4){
-                                        const rampPositions=o.d>0?RAMP_X:RAMP_LEFT;
+                                        const rp=o.d>0?RAMP_X:RAMP_L;
                                         for(let ri=0;ri<7;ri++){
-                                            // ASM: effective x = barrel.x (or barrel.x+1 when moving left via iny)
-                                            const ex=o.d>0?o.x:o.x+1;
-                                            if(ex===rampPositions[ri]){
-                                                o.y+=1;
-                                                break;
-                                            }
+                                            const ex=o.d>0?o.x:o.x+1; // ASM: iny when moving left
+                                            if(ex===rp[ri]){o.y+=1;break}
                                         }
                                     }
 
-                                    // Walkway edge → enter falling state (ASM ladder equivalent)
-                                    const surf=ZIG[o.w];
-                                    if(o.d>0&&o.x>=surf[1]){
-                                        if(o.w===5){o.a=false;st.score+=100;continue}
-                                        o.ty=Math.min(o.w+1,5);
-                                        o.s=2;
-                                    }else if(o.d<0&&o.x<=surf[0]){
-                                        if(o.w===5){o.a=false;st.score+=100;continue}
-                                        o.ty=Math.min(o.w+1,5);
+                                    // ASM ladder detection: every frame, at specific X, barrel falls VERTICALLY
+                                    if(o.w<5){
+                                    o.lc=(o.lc||0)+1;
+                                    if(o.lc>=12){ // check every ~12-18 frames
+                                        o.lc=0;
+                                        const lx=LADDER_X[o.w];
+                                        if(lx){
+                                            for(let li=0;li<lx.length;li++){
+                                                if(Math.abs(o.x-lx[li])<4){
+                                                    o.ty=o.w+1;
+                                                    o.s=2; // start falling (ASM: ora #$F0)
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    }
+
+                                    // FALLBACK: if barrel reaches walkway edge without finding a ladder, force descent
+                                    if(o.w<5&&(o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
+                                        o.ty=o.w+1;
                                         o.s=2;
                                     }
-                                }else if(o.s===2){ // FALLING state — diagonal ramp descent
-                                    // Follow ramp: x moves in current direction, y falls at 2px/frame
-                                    o.x+=o.d*spd;
-                                    o.y+=2; // ASM: inc verPosP1,x twice
-
+                                }else if(o.s===2){ // FALLING — ASM: direction & $80 != 0
+                                    o.y+=2; // ASM: inc verPosP1,x twice — NO horizontal movement
                                     if(o.y>=wy(o.ty)){
                                         o.y=wy(o.ty);
                                         o.w=o.ty;
                                         o.s=1;
-                                        o.d=-o.d; // ASM: eor #$F1 → toggle direction
+                                        o.d=-o.d; // ASM: eor #$F1 (toggle direction & clear falling)
+                                        o.lc=0;
                                     }
-                                    if(o.y>240){o.a=false;st.score+=100}
                                 }
 
-                                if(o.w===5&&o.x<92){o.a=false;st.score+=100}
-                                if(o.x<0||o.x>320){o.a=false;st.score+=100}
+                                if(o.w===5&&o.x<92){o.a=false;st.score+=100;continue}
                             }
 
                 st.ot++;
                 if(st.ot%st.brs===0){
-                            const act=st.obs.filter(o=>o.a&&o.s!==0);
-                            if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,vy:0,ty:0,fb:Math.random()<0.1});
+                            const act=st.obs.filter(o=>o.a);
+                            if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,lc:0,ty:0,fb:Math.random()<0.1});
                         }
 
     if(st.jht<=0){
