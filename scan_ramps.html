@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html><body><img id=ref src=ref.gif><canvas id=c width=320 height=240></canvas>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+const img=document.getElementById('ref');
+img.onload=()=>{
+    cx.drawImage(img,0,0);
+    const d=cx.getImageData(0,0,320,240).data;
+    // Trace the PURPLE ramps: find x for each y where ramp pixels exist
+    // Ramp pixels are PAL purple (189,102,175) ± tolerance
+    function isPurple(r,g,b){return Math.abs(r-189)<15&&Math.abs(g-102)<15&&Math.abs(b-175)<15}
+    function isBg(r,g,b){return r<30&&g<30&&b<30}
+    
+    // Right sweep (W0→W1): look at y=100-130, find leftmost/rightmost purple in each row
+    console.log('=== RIGHT SWEEP (y=100-130) ===');
+    for(let y=100;y<=130;y++){
+        let left=-1,right=-1;
+        for(let x=64;x<256;x++){
+            const i=(y*320+x)*4;
+            if(isPurple(d[i],d[i+1],d[i+2])){
+                if(left===-1)left=x;
+                right=x;
+            }
+        }
+        if(left>=0)console.log('y='+y+' x=['+left+'-'+right+'] width='+(right-left+1));
+    }
+    
+    // Left sweep (W1→W2): y=140-155
+    console.log('=== LEFT SWEEP (y=140-158) ===');
+    for(let y=140;y<=158;y++){
+        let left=-1,right=-1;
+        for(let x=64;x<256;x++){
+            const i=(y*320+x)*4;
+            if(isPurple(d[i],d[i+1],d[i+2])){
+                if(left===-1)left=x;
+                right=x;
+            }
+        }
+        if(left>=0)console.log('y='+y+' x=['+left+'-'+right+'] width='+(right-left+1));
+    }
+    
+    // Right sweep 2 (W2→W3): y=168-182
+    console.log('=== RIGHT SWEEP 2 (y=168-185) ===');
+    for(let y=168;y<=185;y++){
+        let left=-1,right=-1;
+        for(let x=64;x<256;x++){
+            const i=(y*320+x)*4;
+            if(isPurple(d[i],d[i+1],d[i+2])){
+                if(left===-1)left=x;
+                right=x;
+            }
+        }
+        if(left>=0)console.log('y='+y+' x=['+left+'-'+right+'] width='+(right-left+1));
+    }
+    
+    // Left sweep 2 (W3→W4): y=195-225
+    console.log('=== LEFT SWEEP 2 (y=195-227) ===');
+    for(let y=195;y<=227;y++){
+        let left=-1,right=-1;
+        for(let x=64;x<256;x++){
+            const i=(y*320+x)*4;
+            if(isPurple(d[i],d[i+1],d[i+2])){
+                if(left===-1)left=x;
+                right=x;
+            }
+        }
+        if(left>=0)console.log('y='+y+' x=['+left+'-'+right+'] width='+(right-left+1));
+    }
+    
+    // Also check gaps between platforms: where is the open space?
+    console.log('=== BARREL DROP PATH ===');
+    // For right sweep: trace the diagonal edge
+    // Find where the "staircase" steps are
+    let prevLeft=999,prevRight=0;
+    for(let y=100;y<=130;y++){
+        let left=-1,right=-1;
+        for(let x=64;x<256;x++){
+            const i=(y*320+x)*4;
+            if(isPurple(d[i],d[i+1],d[i+2])){
+                if(left===-1)left=x;
+                right=x;
+            }
+        }
+        if(left>=0){
+            const diagLeft=prevLeft-left;
+            const diagRight=prevRight-right;
+            if(diagLeft!==0||diagRight!==0)console.log('y='+y+' x=['+left+'-'+right+'] ΔL='+diagLeft+' ΔR='+diagRight);
+            prevLeft=left;prevRight=right;
+        }
+    }
+};
+</script></body></html>

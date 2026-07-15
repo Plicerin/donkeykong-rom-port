@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html><body><img id=ref src=ref.gif><canvas id=c width=320 height=240></canvas>
+<script>
+const cv=document.getElementById('c'),cx=cv.getContext('2d');
+const img=document.getElementById('ref');
+img.onload=()=>{
+    cx.drawImage(img,0,0);
+    const d=cx.getImageData(0,0,320,240).data;
+    
+    // Find barrel-colored pixels (orange/brown ~132,62,0)
+    function isBarrel(r,g,b){
+        return (r>100&&r<180)&&(g>30&&g<120)&&(b<50);
+    }
+    // Find DK orange (~180,60,0)
+    function isDK(r,g,b){
+        return (r>160)&&(g>40&&g<80)&&(b<30);
+    }
+    // Find Mario red (~200,50,50)
+    function isMario(r,g,b){
+        return (r>160)&&(g<60)&&(b<60)&&!isDK(r,g,b);
+    }
+    
+    console.log('=== DK POSITION ===');
+    for(let y=0;y<240;y+=2){
+        let xmin=-1,xmax=-1;
+        for(let x=0;x<320;x++){
+            const i=(y*320+x)*4;
+            if(isDK(d[i],d[i+1],d[i+2])){
+                if(xmin<0)xmin=x;
+                xmax=x;
+            }
+        }
+        if(xmin>=0)console.log('y='+y+' DK x=['+xmin+'-'+xmax+']');
+    }
+    
+    console.log('=== BARREL POSITIONS ===');
+    for(let y=0;y<240;y+=2){
+        let xmin=-1,xmax=-1;
+        for(let x=0;x<320;x++){
+            const i=(y*320+x)*4;
+            if(isBarrel(d[i],d[i+1],d[i+2])){
+                if(xmin<0)xmin=x;
+                xmax=x;
+            }
+        }
+        if(xmin>=0)console.log('y='+y+' barrel x=['+xmin+'-'+xmax+'] size='+(xmax-xmin+1)+'px');
+    }
+    
+    console.log('=== MARIO POSITION ===');
+    for(let y=0;y<240;y+=2){
+        let xmin=-1,xmax=-1;
+        for(let x=0;x<320;x++){
+            const i=(y*320+x)*4;
+            if(isMario(d[i],d[i+1],d[i+2])){
+                if(xmin<0)xmin=x;
+                xmax=x;
+            }
+        }
+        if(xmin>=0)console.log('y='+y+' Mario x=['+xmin+'-'+xmax+'] size='+(xmax-xmin+1)+'px');
+    }
+};
+</script></body></html>
