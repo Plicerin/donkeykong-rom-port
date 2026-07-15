@@ -202,6 +202,35 @@ function dS(sp,x,y,clr){
     }
 }
 
+// ASM 2600 sprites (reversed from feet-first ASM to canvas top-first)
+// StationaryMarioSprite (18 bytes, 18 rows)
+const MARIO_S=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0x1F,0x3F,0x7B,0x76,0x75,0x7B,0x3F,0x1B,0x1B,0x3F,0x00];
+// RunningMarioSprite1 (19 bytes)
+const MARIO_R1=[0x00,0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x9E,0xFE,0xF7,0x7F,0xBD,0xBD,0xFC,0xEE,0x02,0x02,0x06,0x00];
+// RunningMarioSprite2 (21 bytes)
+const MARIO_R2=[0x00,0x00,0x00,0x00,0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x1C,0x3E,0x7E,0x7E,0x0E,0x1F,0x1F,0x0D,0x0C,0x1C,0x00];
+// JumpingMarioSprite (16 bytes)
+const MARIO_J=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0xFE,0xFF,0x3F,0xBC,0xFE,0xFF,0x07,0x00,0x00];
+
+const BAR=[0x3C,0x6E,0xFB,0xBF,0xFD,0xDF,0x76,0x3C]; // ASM HorizontalBarrelSprite
+const BAR2=[0x3C,0x7E,0xDD,0xDF,0xF7,0xB7,0x7E,0x3C];
+const BAR_FALL=[0x7E,0x99,0xBD,0x81,0xBD,0x99,0x7E,0x00]; // ASM FallingBarrelSprite
+
+function mirrorBytes(sp){
+    const out=[];
+    for(let r=0;r<sp.length;r++){
+        let b=0;
+        for(let i=0;i<8;i++)b|=((sp[r]>>i)&1)<<(7-i);
+        out.push(b);
+    }
+    return out;
+}
+const MARIO_S_L=mirrorBytes(MARIO_S);
+const MARIO_R1_L=mirrorBytes(MARIO_R1);
+const MARIO_R2_L=mirrorBytes(MARIO_R2);
+const MARIO_J_L=mirrorBytes(MARIO_J);
+
+// Girlfriend sprite (20 bytes for top-of-level decoration)
 const GF=[0x00,0x00,0x00,0x07,0x1F,0x3A,0xBF,0x7E,0x9C,0x38,0x7E,0x18,0x3C,0x7E,0xFF,0x7F,0x7E,0x82,0x43,0x00];
 
 function drawPlats(){
@@ -226,12 +255,11 @@ function drawGF(){
         for(let c=0;c<8;c++)if(b&(0x80>>c))dR(gx+c,gy+r,1,1,clrs[r%clrs.length]);
     }
 }
-const BAR=[0x3C,0x76,0xDF,0xFD,0xBF,0xFB,0x6E,0x3C];
-const BAR2=[0x3C,0x7E,0xDD,0xDF,0xF7,0xB7,0x7E,0x3C];
 function drawBarrel(o){
-    const col=o.fb?[40,100,255]:O; // fire barrel = blue
-    const hop=(o.s===2)?Math.sin(st.fr*0.2)*3:0; // continuous bounce on ramp
-    dS(st.fr%2?BAR:BAR2,o.x,o.y-7-hop,col);
+    const col=o.fb?[40,100,255]:O;
+    const top=o.y-8;
+    if(o.s===2){dS(BAR_FALL,o.x,top,col);return}
+    dS(Math.floor(st.fr/3)%2?BAR:BAR2,o.x,top,col);
 }
 const MARIO=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0x1F,0x3F,0x7B,0x76,0x75,0x7B,0x3F,0x1B,0x1B,0x3F,0x00];
 
@@ -248,10 +276,33 @@ const NFO=[
 [0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00]];
 
 function drawMario(){
+    // Determine sprite based on state
+    const isLeft=st.jht>0?(st.jht_dir===0xFD):(st.md===0||st.md===-1);
+    let sp,topOff;
+    if(st.jht>0||st.flg){
+        // Jumping: use jump sprite
+        sp=isLeft?MARIO_J_L:MARIO_J;
+        topOff=16;
+    }else if(keys['ArrowLeft']||keys['ArrowRight']){
+        // Walking: alternate run frames every 4 frames
+        const fr=Math.floor(st.fr/4)%2;
+        if(fr){
+            sp=isLeft?MARIO_R1_L:MARIO_R1;
+            topOff=19;
+        }else{
+            sp=isLeft?MARIO_R2_L:MARIO_R2;
+            topOff=21;
+        }
+    }else{
+        // Stationary
+        sp=isLeft?MARIO_S_L:MARIO_S;
+        topOff=18;
+    }
     const mx=st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx);
-    const my=st.my-16;
-    dS(MARIO,mx,my,R);
+    const my=st.my-topOff;
+    dS(sp,mx,my,R);
 }
+
 
 function drawScore(){
     const d=[];let s=st.score;
@@ -279,7 +330,7 @@ function drawBJCount(){
 function drawLives(){
     for(let i=0;i<st.lives;i++){
         for(let r=0;r<8;r++){
-            const b=MARIO[r];
+            const b=MARIO_S[r];
             if(r===8)continue;
             for(let c=0;c<4;c++)if(b&(0x80>>c))dR(8+i*12+c,230+r,1,1,R);
         }
@@ -516,7 +567,7 @@ function drawAttract(){
     drawGF();
     const marMX=160+Math.floor(Math.sin(st.fr/30)*60);
     const marMY=wy(5)-16;
-    dS(MARIO,marMX,marMY,R);
+    dS(MARIO_S,marMX,marMY,R);
     cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
     cx.font='bold 20px monospace';
     cx.textAlign='center';
@@ -542,12 +593,13 @@ function drawGO(){
     cx.textAlign='left';
 }
 
-function loop(ts){
-    if(!lt)lt=ts;const dt=ts-lt;lt=ts;
-    if(dt>=16&&!paused){update();render()}
+function loop(){
+    if(!paused){update();render()}
     requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+// Fallback in case rAF is throttled:
+if(!window._dkLoopFix){window._dkLoopFix=true;setInterval(function(){if(!paused){update();render()}},17)}
 </script>
 <script src="donkey-kong-bot.js"></script>
 </body>
