@@ -243,31 +243,6 @@ function drawPlats(){
     }
 }
 
-function drawLadders(){
-    // Ladders between walkways at ASM LadderHorizValues positions
-    // Scaled from TIA [51,65,79,93,107,121] to canvas
-    const LADDER_X=[102,130,158,186,214,242];
-    for(let w=0;w<NW-1;w++){
-        const top=wy(w)+24; // bottom of platform body
-        const bot=wy(w+1);  // top of next platform
-        if(bot-top<3)continue; // skip if platforms almost touch
-        for(let lx of LADDER_X){
-            // Only draw ladders within the walkway x-bounds
-            const l=ZIG[w][0],r=ZIG[w][1];
-            if(lx<l||lx>r)continue;
-            // Ladder rungs every 4px, vertical side rails 2px wide
-            // Left rail
-            dR(lx-1,top,2,bot-top+1,1,TQ);
-            // Right rail
-            dR(lx+6,top,2,bot-top+1,1,TQ);
-            // Rungs every 4px
-            for(let ry=top;ry<=bot;ry+=4){
-                dR(lx,ry,8,1,TQ);
-            }
-        }
-    }
-}
-
 function drawDK(){
     const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
     // DK sitting on top walkway — bottom of sprite touches platform top
@@ -376,25 +351,13 @@ function render(){
         cx.fillStyle='rgb('+rr+','+rg+','+rb+')';
         cx.fillRect(x,y,1,1);
       }
-      // Step 2: generate expected game pixels from same logic as drawPlats/drawLadders/drawDK/drawGF
+      // Step 2: generate expected game pixels from same logic as drawPlats/drawDK/drawGF
       const gpx={};
       function gPx(x,y){gpx[y+':'+x]=true}
       // Platform pixels from reference PLAT_DATA (walkways + sweeps + connectors)
       for(let y in PLAT_DATA){
         const spans=PLAT_DATA[y];const yy=parseInt(y);
         for(let sp of spans)for(let x=sp[0];x<=sp[1];x++)gPx(x,yy);
-      }
-      // Ladders (mirrors drawLadders)
-      const LADDER_X=[102,130,158,186,214,242];
-      for(let w=0;w<NW-1;w++){
-        const top=wy(w)+24,bot=wy(w+1);
-        if(bot-top<3)continue;
-        for(let lx of LADDER_X){
-          const l=ZIG[w][0],r=ZIG[w][1];
-          if(lx<l||lx>r)continue;
-          for(let dy=0;dy<=bot-top;dy++){const y=top+dy;const dx=dy%2;gPx(lx+dx,y);gPx(lx+1+dx,y);gPx(lx+6+dx,y);gPx(lx+7+dx,y)}
-          for(let ry=top;ry<=bot;ry+=4)for(let dx=0;dx<8;dx++)gPx(lx+dx,ry);
-        }
       }
       // DK sprite pixels (at position 68, wy(0)-19)
       const DKy=wy(0)-19;
@@ -427,7 +390,6 @@ function render(){
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
-    drawLadders();
     drawDK();
     drawGF();
     for(let o of st.obs)drawBarrel(o);
@@ -603,7 +565,6 @@ function drawAttract(){
     cx.fillStyle='rgb('+bg[0]+','+bg[1]+','+bg[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
-    drawLadders();
     drawDK();
     drawGF();
     const marMX=160+Math.floor(Math.sin(st.fr/30)*60);
