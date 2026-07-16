@@ -47,18 +47,18 @@ function think(){
   const t=threatOn(w);
   if(t){
     const b=t.b,dist=t.dist;
-    if(dist<20){
-      // CRITICAL — barrel about to hit! JUMP
+    // JUMP when barrel is within range — move toward barrel for crossing
+    if(dist<45){
+      // Move toward barrel so we cross over it mid-jump
+      if(b.x>st.mx){goRight()}else{goLeft()}
       keys['Space']=true;
-      if(b.d>0){goLeft()}else{goRight()}
       return;
     }
-    if(dist<50){
-      // barrel approaching — move away from direction
-      if(b.d>0&&b.x<st.mx){goRight()}
-      else if(b.d<0&&b.x>st.mx){goLeft()}
-      else if(st.mx<ctr){goRight()}
-      else if(st.mx>ctr){goLeft()}
+    // Barrel approaching — steer into its path but DON'T chase to edges
+    if(dist<150){
+      // Only move toward barrel if we're not near an edge
+      if(b.x>st.mx && st.mx < ctr+20){goRight()}
+      else if(b.x<st.mx && st.mx > ctr-20){goLeft()}
       else{releaseDir()}
       keys['Space']=false;
       return;

@@ -401,76 +401,10 @@ function update(){
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
 
-    // === FALLING ===
-    if(st.flg){
-        st.my+=2;
-        const pw=onPlatform(st.mx,st.my);
-        if(pw>=0){
-            st.w=pw;st.my=wy(pw);st.flg=0;st.jht=0;
-        }
-        if(st.my>wy(5)+20){
-            st.lives--;sD();
-                        if(st.lives<=0){st.mode=1;st.got=0}
-                        else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0;st.flg=0}
-            return;
-        }
-        return;
-    }
-
-    // === JUMP ===
-    if(st.jht>0){
-        st.jht--;
-        let jdir=st.jht_dir;
-        if(jdir===0xFD&&st.mx>ZIG[st.w][0])st.mx-=2;
-        if(jdir===0xFE&&st.mx<ZIG[st.w][1])st.mx+=2;
-        if(st.jht<=0){
-            st.my=Math.min(st.my+7,255);
-            const pw=onPlatform(st.mx,st.my);
-            if(pw>=0){st.w=pw;st.my=wy(pw);st.jht=0;st.flg=0;}
-            else{st.flg=1;}
-        }
-        return;
-    }
-
-    // === GROUNDED MOVEMENT ===
-            let dir=0xFF;
-            if(keys['ArrowLeft'])dir=0xFD;
-            if(keys['ArrowRight'])dir=0xFE;
-
-            const surf=ZIG[st.w];
-            const leftB=surf[0],rightB=surf[1];
-            // Allow walking past edges for all walkways EXCEPT ground (w=5)
-            if(st.w===5){
-                if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
-                if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
-            }else{
-                if(dir===0xFD&&st.mx>0){st.mx--;st.md=0}
-                if(dir===0xFE&&st.mx<315){st.mx++;st.md=1}
-            }
-
-        // Gravity: fall if not standing on a platform
-        if(!st.flg&&st.jht<=0){
-            const pw=onPlatform(st.mx,st.my+2);
-            if(pw>=0){st.w=pw;st.my=wy(pw);st.flg=0}
-            else{st.my+=2;st.flg=1}
-        }
-
-    if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
-
-    if((keys['Space']||keys['KeyZ'])&&st.hmt<=0){
-        st.jht=28;
-        st.jht_dir=st.md<0?0xFF:(st.md===0?0xFD:0xFE);
-        st.my-=7;st.md=-1;sJ();
-    }
-
-    // === BARRELS (ASM-exact) ===
-                            // ASM: RampHorizValues = $2D..$75 (45,58,69,81,93,105,117)
-                            // 2600 x [36,124] → canvas [90,310], scale=2.5
+    // === BARRELS (run EVERY frame, regardless of Mario state) ===
                             const RAMP_X=[112,145,173,203,233,263,293];
                             const RAMP_L=[44,77,105,135,165,195,225];
-                            // ASM LadderHorizValues per walkway (canvas): barrels find a ladder X to descend VERTICALLY
                             const LADDER_X=[[273,308],[123,203,88,308],[223,273,88,308],[123,163,173,183],[253,273],[193]];
-                            // Walkway boundaries (barrel full x-range, ASM XMIN=$24 XMAX=$7C)
                             const BARREL_LB=[92,90,90,90,92,92];
                             const BARREL_RB=[320,310,310,310,310,310];
 
@@ -480,52 +414,45 @@ function update(){
                                 if(!o.a){st.obs.splice(i,1);continue}
                                 const spd=o.fb?2:1;
 
-                                if(o.s===1){ // ROLLING — ASM: direction & $80 == 0
-                                    o.x+=o.d*spd; // ASM: inc/dec horPosP1,x
-
-                                    // ASM BarrelRampMovement: at 7 ramp x positions, y+=1 (non-top, non-bottom)
+                                if(o.s===1){
+                                    o.x+=o.d*spd;
                                     if(o.w>=1&&o.w<=4){
                                         const rp=o.d>0?RAMP_X:RAMP_L;
                                         for(let ri=0;ri<7;ri++){
-                                            const ex=o.d>0?o.x:o.x+1; // ASM: iny when moving left
+                                            const ex=o.d>0?o.x:o.x+1;
                                             if(ex===rp[ri]){o.y+=1;break}
                                         }
                                     }
-
-                                    // ASM ladder detection: every frame, at specific X, barrel falls VERTICALLY
                                     if(o.w<5){
                                     o.lc=(o.lc||0)+1;
-                                    if(o.lc>=12){ // check every ~12-18 frames
+                                    if(o.lc>=12){
                                         o.lc=0;
                                         const lx=LADDER_X[o.w];
                                         if(lx){
                                             for(let li=0;li<lx.length;li++){
                                                 if(Math.abs(o.x-lx[li])<4){
                                                     o.ty=o.w+1;
-                                                    o.s=2; // start falling (ASM: ora #$F0)
+                                                    o.s=2;
                                                     break;
                                                 }
                                             }
                                         }
                                     }
                                     }
-
-                                    // FALLBACK: if barrel reaches walkway edge without finding a ladder, force descent
                                     if(o.w<5&&(o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
                                         o.ty=o.w+1;
                                         o.s=2;
                                     }
-                                }else if(o.s===2){ // FALLING — ASM: direction & $80 != 0
-                                    o.y+=2; // ASM: inc verPosP1,x twice — NO horizontal movement
+                                }else if(o.s===2){
+                                    o.y+=2;
                                     if(o.y>=wy(o.ty)){
                                         o.y=wy(o.ty);
                                         o.w=o.ty;
                                         o.s=1;
-                                        o.d=-o.d; // ASM: eor #$F1 (toggle direction & clear falling)
+                                        o.d=-o.d;
                                         o.lc=0;
                                     }
                                 }
-
                                 if(o.w===5&&o.x<92){o.a=false;st.score+=100;continue}
                             }
 
@@ -535,19 +462,76 @@ function update(){
                             if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,lc:0,ty:0,fb:Math.random()<0.1});
                         }
 
-    if(st.jht<=0){
+    // === PLAYER STATE MACHINE (only one state per frame) ===
+    if(st.flg){
+        // FALLING
+        st.my+=2;
+        const pw=onPlatform(st.mx,st.my);
+        if(pw>=0){
+            st.w=pw;st.my=wy(pw);st.flg=0;st.jht=0;
+        }
+        if(st.my>wy(5)+20){
+            st.lives--;sD();
+            if(st.lives<=0){st.mode=1;st.got=0}
+            else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0;st.flg=0}
+        }
+    }else if(st.jht>0){
+        // JUMPING — parabolic arc
+        st.jht--;
+        const jt=st.jht;
+        // Arc: rise for first 14 frames, fall for last 14
+        if(jt>14){st.my-=3}   // rising (4px/frame)
+        else{st.my+=3}        // falling (4px/frame)
+        let jdir=st.jht_dir;
+        if(jdir===0xFD&&st.mx>ZIG[st.w][0])st.mx-=2;
+        if(jdir===0xFE&&st.mx<ZIG[st.w][1])st.mx+=2;
+        if(st.jht<=0){
+            st.my=Math.min(st.my+7,255);
+            const pw=onPlatform(st.mx,st.my);
+            if(pw>=0){st.w=pw;st.my=wy(pw);st.jht=0;st.flg=0;}
+            else{st.flg=1;}
+        }
+    }else{
+        // GROUNDED
+            let dir=0xFF;
+            if(keys['ArrowLeft'])dir=0xFD;
+            if(keys['ArrowRight'])dir=0xFE;
+            const surf=ZIG[st.w];
+            const leftB=surf[0],rightB=surf[1];
+            if(st.w===5){
+                if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
+                if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
+            }else{
+                if(dir===0xFD&&st.mx>0){st.mx--;st.md=0}
+                if(dir===0xFE&&st.mx<315){st.mx++;st.md=1}
+            }
+        if(!st.flg&&st.jht<=0){
+            const pw=onPlatform(st.mx,st.my+2);
+            if(pw>=0){st.w=pw;st.my=wy(pw);st.flg=0}
+            else{st.my+=2;st.flg=1}
+        }
+        if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
+        if((keys['Space']||keys['KeyZ'])&&st.hmt<=0){
+            st.jht=28;
+            st.jht_dir=st.md<0?0xFF:(st.md===0?0xFD:0xFE);
+            st.my-=7;st.md=-1;sJ();
+        }
+    }
+
+    // === COLLISION & JUMP COUNTER (after all movement) ===
+    if(!st.dcd&&st.jht<=0&&!st.flg){
         for(let o of st.obs){
             if(!o.a)continue;
             if(Math.abs(st.mx-o.x)<6&&Math.abs(st.my-o.y)<12){
                 st.lives--;sD();
                 if(st.lives<=0){st.mode=1;st.got=0}
                 else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0}
-                return;
+                break;
             }
         }
     }
 
-    // Barrel-jump counter: Mario airborne & passes directly over a barrel
+    // Barrel-jump counter: Mario airborne & passes over a barrel
     if(st.flg||st.jht>0){
         for(let o of st.obs){
             if(!o.a||o.bj)continue;
