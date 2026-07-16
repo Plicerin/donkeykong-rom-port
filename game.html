@@ -41,8 +41,8 @@ const ZIG=[[64,159],[64,239],[96,143],[128,183],[96,167],[64,255]];
 
 // Diagonal sweep connector data (connecting walkways)
 // Generated from reference — these create the diagonal girder transitions
-const SWEEP_DATA = {
-  // Score area decoration
+const PLAT_DATA = {
+  // Score area
   58: [[232,239],[248,255]],
   59: [[232,239],[248,255]],
   60: [[232,239],[248,255]],
@@ -51,7 +51,22 @@ const SWEEP_DATA = {
   63: [[232,239],[248,255]],
   64: [[232,239],[248,255]],
   65: [[232,239],[248,255]],
-  // Right sweep W0→W1 (descending)
+  // W0 SURFACE
+  70: [[64,159]],
+  71: [[64,159]],
+  // W0 edge posts (every 4 rows)
+  75: [[64,71],[152,159]],
+  79: [[64,71],[152,159]],
+  83: [[64,71],[152,159]],
+  87: [[64,71],[152,159]],
+  91: [[64,71],[152,159]],
+  // Support band
+  95: [[64,239]],
+  96: [[64,71],[80,95],[104,119],[128,143],[152,167],[176,191],[200,215],[224,239]],
+  97: [[72,79],[96,103],[120,127],[144,151],[168,175],[192,199],[216,223]],
+  98: [[64,71],[80,95],[104,119],[128,143],[152,167],[176,191],[200,215],[224,239]],
+  99: [[64,239]],
+  // Diagonal transition (post-to-post)
   103: [[152,159],[216,223]],
   104: [[116,123]],
   105: [[116,123]],
@@ -59,6 +74,7 @@ const SWEEP_DATA = {
   107: [[216,223]],
   111: [[216,223]],
   115: [[152,159],[216,223]],
+  // Right sweep (descending)
   116: [[232,255]],
   117: [[208,239],[248,255]],
   118: [[184,215],[224,231],[240,247]],
@@ -71,7 +87,12 @@ const SWEEP_DATA = {
   125: [[88,95],[104,135]],
   126: [[80,111]],
   127: [[80,87],[96,103],[136,143],[200,207]],
-  // Left sweep W1→W2 (descending)
+  // W1 posts (walkway level 1)
+  131: [[96,103],[136,143]],
+  135: [[96,103],[136,143]],
+  139: [[96,103],[136,143],[200,207]],
+  143: [[96,103],[136,143],[200,207]],
+  // Left sweep (descending)
   144: [[64,87]],
   145: [[64,71],[80,111]],
   146: [[72,79],[88,95],[104,135]],
@@ -84,7 +105,12 @@ const SWEEP_DATA = {
   153: [[184,215],[224,231]],
   154: [[208,239]],
   155: [[128,135],[176,183],[216,223],[232,239]],
-  // Right sweep W2→W3 (descending)
+  // W2 posts (walkway level 2)
+  159: [[176,183],[216,223]],
+  163: [[176,183],[216,223]],
+  167: [[128,135],[176,183],[218,219]],
+  171: [[128,135],[176,183],[220,221]],
+  // Right sweep (descending)
   172: [[232,255]],
   173: [[208,239],[248,255]],
   174: [[184,215],[224,231],[240,247]],
@@ -97,7 +123,12 @@ const SWEEP_DATA = {
   181: [[88,95],[104,135]],
   182: [[80,111]],
   183: [[80,87],[96,103],[160,167]],
-  // Left sweep W3→W4 (descending)
+  // W3 posts (walkway level 3)
+  187: [[96,103],[160,167]],
+  191: [[96,103],[160,167]],
+  195: [[96,103],[160,167]],
+  199: [[96,103],[160,165]],
+  // Left sweep (descending)
   200: [[64,87]],
   201: [[64,71],[80,111]],
   202: [[72,79],[88,95],[104,135]],
@@ -110,7 +141,7 @@ const SWEEP_DATA = {
   209: [[184,215],[224,231]],
   210: [[208,239]],
   211: [[144,151],[216,223],[232,239]],
-  // Lower connector posts
+  // Lower posts
   215: [[216,223]],
   216: [[72,87]],
   218: [[72,87]],
@@ -121,6 +152,9 @@ const SWEEP_DATA = {
   224: [[72,87]],
   226: [[72,87]],
   227: [[144,151],[216,223]],
+  // GROUND
+  228: [[64,255]],
+  229: [[64,255]],
 };
 
 let st={mode:0,w:5,mx:160,my:228,md:-1,lives:2,score:0,bt:80,obs:[],brs:80,
@@ -200,26 +234,12 @@ const MARIO_J_L=mirrorBytes(MARIO_J);
 const GF=[0x00,0x00,0x00,0x07,0x1F,0x3A,0xBF,0x7E,0x9C,0x38,0x7E,0x18,0x3C,0x7E,0xFF,0x7F,0x7E,0x82,0x43,0x00];
 
 function drawPlats(){
-    // Walkway platforms (programmatic, pixel-perfect from ZIG/WY)
-    for(let w=0;w<NW;w++){
-        const l=ZIG[w][0],r=ZIG[w][1],top=wy(w);
-        // 24-row walkway body with notched surface + zigzag edges
-        for(let row=0;row<24;row++){
-            const m=row%9;
-            if(m!==0&&m!==1&&m!==5)continue; // notched: 2s+3b+1s+3b repeating
-            const step=row<3?0:(row<6?1:(row<9?2:3));
-            const off=step*4;
-            dR(l+off,top+row,r-off-l-off+1,1,BR);
+    for(let y in PLAT_DATA){
+        const spans=PLAT_DATA[y];
+        const yy=parseInt(y);
+        for(let sp of spans){
+            dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
         }
-        // Support posts (3 left, 3 right, 3px wide, 4px tall, below body)
-        const py=top+24;
-        for(let px of[l,l+4,l+8])dR(px,py,3,4,BR);
-        for(let px of[r-6,r-10,r-14])dR(px,py,3,4,BR);
-    }
-    // Diagonal sweep connectors
-    for(let y in SWEEP_DATA){
-        const spans=SWEEP_DATA[y];const yy=parseInt(y);
-        for(let sp of spans)dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
     }
 }
 
@@ -359,24 +379,9 @@ function render(){
       // Step 2: generate expected game pixels from same logic as drawPlats/drawLadders/drawDK/drawGF
       const gpx={};
       function gPx(x,y){gpx[y+':'+x]=true}
-      // Walkway platforms (mirrors drawPlats exactly)
-      for(let w=0;w<NW;w++){
-        const l=ZIG[w][0],r=ZIG[w][1],top=wy(w);
-        for(let row=0;row<24;row++){
-          const m=row%9;
-          if(m!==0&&m!==1&&m!==5)continue;
-          const step=row<3?0:(row<6?1:(row<9?2:3));
-          const off=step*4;
-          for(let x=l+off;x<=r-off;x++)gPx(x,top+row);
-        }
-        // Support posts
-        const py=top+24;
-        for(let px of[l,l+4,l+8])for(let dy=0;dy<4;dy++)for(let dx=0;dx<3;dx++)gPx(px+dx,py+dy);
-        for(let px of[r-6,r-10,r-14])for(let dy=0;dy<4;dy++)for(let dx=0;dx<3;dx++)gPx(px+dx,py+dy);
-      }
-      // Sweep connectors
-      for(let y in SWEEP_DATA){
-        const spans=SWEEP_DATA[y];const yy=parseInt(y);
+      // Platform pixels from reference PLAT_DATA (walkways + sweeps + connectors)
+      for(let y in PLAT_DATA){
+        const spans=PLAT_DATA[y];const yy=parseInt(y);
         for(let sp of spans)for(let x=sp[0];x<=sp[1];x++)gPx(x,yy);
       }
       // Ladders (mirrors drawLadders)
