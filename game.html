@@ -280,25 +280,26 @@ const NFO=[
 
 function drawMario(){
     // Determine sprite based on state
+    // Original ASM sprites are LEFT-facing; _L variants are bit-reversed (RIGHT-facing)
     const isLeft=st.jht>0?(st.jht_dir===0xFD):(st.md===0||st.md===-1);
     let sp,topOff;
     if(st.jht>0||st.flg){
         // Jumping: use jump sprite
-        sp=isLeft?MARIO_J_L:MARIO_J;
+        sp=isLeft?MARIO_J:MARIO_J_L;
         topOff=16;
     }else if(keys['ArrowLeft']||keys['ArrowRight']){
         // Walking: alternate run frames every 4 frames
         const fr=Math.floor(st.fr/4)%2;
         if(fr){
-            sp=isLeft?MARIO_R1_L:MARIO_R1;
+            sp=isLeft?MARIO_R1:MARIO_R1_L;
             topOff=19;
         }else{
-            sp=isLeft?MARIO_R2_L:MARIO_R2;
+            sp=isLeft?MARIO_R2:MARIO_R2_L;
             topOff=21;
         }
     }else{
         // Stationary
-        sp=isLeft?MARIO_S_L:MARIO_S;
+        sp=isLeft?MARIO_S:MARIO_S_L;
         topOff=18;
     }
     const mx=st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx);
@@ -503,7 +504,7 @@ function update(){
         if(st.jht<=0){
             st.my=Math.min(st.my+7,255);
             const pw=onPlatform(st.mx,st.my);
-            if(pw>=0){st.w=pw;st.my=wy(pw);st.jht=0;st.flg=0;}
+            if(pw>=0){st.w=pw;st.my=wy(pw);st.jht=0;st.flg=0;st.md=st.jht_dir===0xFD?0:(st.jht_dir===0xFE?1:-1);}
             else{st.flg=1;}
         }
     }else{
