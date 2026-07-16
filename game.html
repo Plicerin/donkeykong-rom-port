@@ -39,10 +39,10 @@ function wy(w){return WY[w]}
 // Ground: full surface [64-255]
 const ZIG=[[64,159],[64,239],[96,143],[128,183],[96,167],[64,255]];
 
-// Platform data from reference color scan (320px)
-// Format: {y: [[x1,x2], ...]}
-const PLAT_DATA = {
-  // Score area
+// Diagonal sweep connector data (connecting walkways)
+// Generated from reference — these create the diagonal girder transitions
+const SWEEP_DATA = {
+  // Score area decoration
   58: [[232,239],[248,255]],
   59: [[232,239],[248,255]],
   60: [[232,239],[248,255]],
@@ -51,22 +51,7 @@ const PLAT_DATA = {
   63: [[232,239],[248,255]],
   64: [[232,239],[248,255]],
   65: [[232,239],[248,255]],
-  // W0 SURFACE
-  70: [[64,159]],
-  71: [[64,159]],
-  // W0 edge posts (every 4 rows)
-  75: [[64,71],[152,159]],
-  79: [[64,71],[152,159]],
-  83: [[64,71],[152,159]],
-  87: [[64,71],[152,159]],
-  91: [[64,71],[152,159]],
-  // Support band
-  95: [[64,239]],
-  96: [[64,71],[80,95],[104,119],[128,143],[152,167],[176,191],[200,215],[224,239]],
-  97: [[72,79],[96,103],[120,127],[144,151],[168,175],[192,199],[216,223]],
-  98: [[64,71],[80,95],[104,119],[128,143],[152,167],[176,191],[200,215],[224,239]],
-  99: [[64,239]],
-  // Diagonal transition (post-to-post)
+  // Right sweep W0→W1 (descending)
   103: [[152,159],[216,223]],
   104: [[116,123]],
   105: [[116,123]],
@@ -74,7 +59,6 @@ const PLAT_DATA = {
   107: [[216,223]],
   111: [[216,223]],
   115: [[152,159],[216,223]],
-  // Right sweep (descending)
   116: [[232,255]],
   117: [[208,239],[248,255]],
   118: [[184,215],[224,231],[240,247]],
@@ -87,12 +71,7 @@ const PLAT_DATA = {
   125: [[88,95],[104,135]],
   126: [[80,111]],
   127: [[80,87],[96,103],[136,143],[200,207]],
-  // W1 posts (walkway level 1)
-  131: [[96,103],[136,143]],
-  135: [[96,103],[136,143]],
-  139: [[96,103],[136,143],[200,207]],
-  143: [[96,103],[136,143],[200,207]],
-  // Left sweep (descending)
+  // Left sweep W1→W2 (descending)
   144: [[64,87]],
   145: [[64,71],[80,111]],
   146: [[72,79],[88,95],[104,135]],
@@ -105,12 +84,7 @@ const PLAT_DATA = {
   153: [[184,215],[224,231]],
   154: [[208,239]],
   155: [[128,135],[176,183],[216,223],[232,239]],
-  // W2 posts (walkway level 2)
-  159: [[176,183],[216,223]],
-  163: [[176,183],[216,223]],
-  167: [[128,135],[176,183],[218,219]],
-  171: [[128,135],[176,183],[220,221]],
-  // Right sweep (descending)
+  // Right sweep W2→W3 (descending)
   172: [[232,255]],
   173: [[208,239],[248,255]],
   174: [[184,215],[224,231],[240,247]],
@@ -123,12 +97,7 @@ const PLAT_DATA = {
   181: [[88,95],[104,135]],
   182: [[80,111]],
   183: [[80,87],[96,103],[160,167]],
-  // W3 posts (walkway level 3)
-  187: [[96,103],[160,167]],
-  191: [[96,103],[160,167]],
-  195: [[96,103],[160,167]],
-  199: [[96,103],[160,165]],
-  // Left sweep (descending)
+  // Left sweep W3→W4 (descending)
   200: [[64,87]],
   201: [[64,71],[80,111]],
   202: [[72,79],[88,95],[104,135]],
@@ -141,7 +110,7 @@ const PLAT_DATA = {
   209: [[184,215],[224,231]],
   210: [[208,239]],
   211: [[144,151],[216,223],[232,239]],
-  // Lower posts
+  // Lower connector posts
   215: [[216,223]],
   216: [[72,87]],
   218: [[72,87]],
@@ -152,9 +121,6 @@ const PLAT_DATA = {
   224: [[72,87]],
   226: [[72,87]],
   227: [[144,151],[216,223]],
-  // GROUND
-  228: [[64,255]],
-  229: [[64,255]],
 };
 
 let st={mode:0,w:5,mx:160,my:228,md:-1,lives:2,score:0,bt:80,obs:[],brs:80,
@@ -234,28 +200,67 @@ const MARIO_J_L=mirrorBytes(MARIO_J);
 const GF=[0x00,0x00,0x00,0x07,0x1F,0x3A,0xBF,0x7E,0x9C,0x38,0x7E,0x18,0x3C,0x7E,0xFF,0x7F,0x7E,0x82,0x43,0x00];
 
 function drawPlats(){
-    for(let y in PLAT_DATA){
-        const spans=PLAT_DATA[y];
-        const yy=parseInt(y);
-        for(let sp of spans){
-            dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
+    // Walkway platforms (programmatic, pixel-perfect from ZIG/WY)
+    for(let w=0;w<NW;w++){
+        const l=ZIG[w][0],r=ZIG[w][1],top=wy(w);
+        // 24-row walkway body with notched surface + zigzag edges
+        for(let row=0;row<24;row++){
+            const m=row%9;
+            if(m!==0&&m!==1&&m!==5)continue; // notched: 2s+3b+1s+3b repeating
+            const step=row<3?0:(row<6?1:(row<9?2:3));
+            const off=step*4;
+            dR(l+off,top+row,r-off-l-off+1,1,BR);
+        }
+        // Support posts (3 left, 3 right, 3px wide, 4px tall, below body)
+        const py=top+24;
+        for(let px of[l,l+4,l+8])dR(px,py,3,4,BR);
+        for(let px of[r-6,r-10,r-14])dR(px,py,3,4,BR);
+    }
+    // Diagonal sweep connectors
+    for(let y in SWEEP_DATA){
+        const spans=SWEEP_DATA[y];const yy=parseInt(y);
+        for(let sp of spans)dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
+    }
+}
+
+function drawLadders(){
+    // Ladders between walkways at ASM LadderHorizValues positions
+    // Scaled from TIA [51,65,79,93,107,121] to canvas
+    const LADDER_X=[102,130,158,186,214,242];
+    for(let w=0;w<NW-1;w++){
+        const top=wy(w)+24; // bottom of platform body
+        const bot=wy(w+1);  // top of next platform
+        if(bot-top<3)continue; // skip if platforms almost touch
+        for(let lx of LADDER_X){
+            // Only draw ladders within the walkway x-bounds
+            const l=ZIG[w][0],r=ZIG[w][1];
+            if(lx<l||lx>r)continue;
+            // Ladder rungs every 4px, vertical side rails 2px wide
+            // Left rail
+            dR(lx-1,top,2,bot-top+1,1,TQ);
+            // Right rail
+            dR(lx+6,top,2,bot-top+1,1,TQ);
+            // Rungs every 4px
+            for(let ry=top;ry<=bot;ry+=4){
+                dR(lx,ry,8,1,TQ);
+            }
         }
     }
 }
 
 function drawDK(){
     const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
-    // DK at top-left area of platform: ref shows x~68, y~50
-    dS(DK,68,wy(0)-20,O);
+    // DK sitting on top walkway — bottom of sprite touches platform top
+    dS(DK,68,wy(0)-19,O);
 }
 function drawGF(){
-    // Pauline: tiny sprite at top platform, blue dress + yellow hair
-    // Ref shows: dress at y=[59,66] x=[126,141], hair at y=[67,68] x=[126,141]
-    const gx=126,gy=48;
+    // Pauline sprite at x=115 (shifted right from DK), on same walkway
+    const gx=115,gy=wy(0)-19;
     for(let r=0;r<GF.length;r++){
         const b=GF[r];
         if(b===0)continue;
-        const clr=r>=16?YL:BL; // head=yellow, body=blue
+        // Colors: top skin/neck = yellow, middle dress = blue, bottom hem = yellow
+        const clr=(r>=3&&r<=6)||(r>=17)?YL:BL;
         for(let c=0;c<8;c++)if(b&(0x80>>c))dR(gx+c,gy+r,1,1,clr);
     }
 }
@@ -342,7 +347,8 @@ function drawLives(){
 
 function render(){
     if(compMode&&refImg){
-      // Comparison mode: show reference + game with diff highlighting
+      // Comparison mode: show reference image, then overlay game diff
+      // Step 1: draw reference as background
       for(let y=0;y<240;y++)for(let x=0;x<320;x++){
         const i=(y*320+x)*4;
         const rr=refImg[i],rg=refImg[i+1],rb=refImg[i+2],ra=refImg[i+3];
@@ -350,23 +356,64 @@ function render(){
         cx.fillStyle='rgb('+rr+','+rg+','+rb+')';
         cx.fillRect(x,y,1,1);
       }
-      // Overlay game platforms with half-alpha
-      for(let y in PLAT_DATA){
-        const spans=PLAT_DATA[y];const yy=parseInt(y);
-        for(let sp of spans){
-          for(let x=sp[0];x<=sp[1];x++){
-            const i=(yy*320+x)*4;
-            const rr=refImg[i],rg=refImg[i+1],rb=refImg[i+2],ra=refImg[i+3];
-            if(ra<128||(Math.abs(rr-BR[0])<20&&Math.abs(rg-BR[1])<20&&Math.abs(rb-BR[2])<20)){
-              cx.fillStyle='rgba(0,255,0,0.3)';cx.fillRect(x,yy,1,1);
-            }else{
-              cx.fillStyle='rgba(255,0,0,0.5)';cx.fillRect(x,yy,1,1);
-            }
-          }
+      // Step 2: generate expected game pixels from same logic as drawPlats/drawLadders/drawDK/drawGF
+      const gpx={};
+      function gPx(x,y){gpx[y+':'+x]=true}
+      // Walkway platforms (mirrors drawPlats exactly)
+      for(let w=0;w<NW;w++){
+        const l=ZIG[w][0],r=ZIG[w][1],top=wy(w);
+        for(let row=0;row<24;row++){
+          const m=row%9;
+          if(m!==0&&m!==1&&m!==5)continue;
+          const step=row<3?0:(row<6?1:(row<9?2:3));
+          const off=step*4;
+          for(let x=l+off;x<=r-off;x++)gPx(x,top+row);
+        }
+        // Support posts
+        const py=top+24;
+        for(let px of[l,l+4,l+8])for(let dy=0;dy<4;dy++)for(let dx=0;dx<3;dx++)gPx(px+dx,py+dy);
+        for(let px of[r-6,r-10,r-14])for(let dy=0;dy<4;dy++)for(let dx=0;dx<3;dx++)gPx(px+dx,py+dy);
+      }
+      // Sweep connectors
+      for(let y in SWEEP_DATA){
+        const spans=SWEEP_DATA[y];const yy=parseInt(y);
+        for(let sp of spans)for(let x=sp[0];x<=sp[1];x++)gPx(x,yy);
+      }
+      // Ladders (mirrors drawLadders)
+      const LADDER_X=[102,130,158,186,214,242];
+      for(let w=0;w<NW-1;w++){
+        const top=wy(w)+24,bot=wy(w+1);
+        if(bot-top<3)continue;
+        for(let lx of LADDER_X){
+          const l=ZIG[w][0],r=ZIG[w][1];
+          if(lx<l||lx>r)continue;
+          for(let dy=0;dy<=bot-top;dy++){const y=top+dy;const dx=dy%2;gPx(lx+dx,y);gPx(lx+1+dx,y);gPx(lx+6+dx,y);gPx(lx+7+dx,y)}
+          for(let ry=top;ry<=bot;ry+=4)for(let dx=0;dx<8;dx++)gPx(lx+dx,ry);
+        }
+      }
+      // DK sprite pixels (at position 68, wy(0)-19)
+      const DKy=wy(0)-19;
+      const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
+      for(let r=0;r<DK.length;r++){const b=DK[r];if(b===0)continue;for(let c=0;c<8;c++)if(b&(0x80>>c))gPx(68+c,DKy+r)}
+      // GF sprite pixels (at position 115, wy(0)-19)
+      const GFy=wy(0)-19;
+      for(let r=0;r<GF.length;r++){const b=GF[r];if(b===0)continue;for(let c=0;c<8;c++)if(b&(0x80>>c))gPx(115+c,GFy+r)}
+      // Step 3: compare game pixels vs reference
+      for(let k in gpx){
+        const [yy,xx]=k.split(':').map(Number);
+        if(xx<0||xx>=320||yy<0||yy>=240)continue;
+        const i=(yy*320+xx)*4;
+        const rr=refImg[i],rg=refImg[i+1],rb=refImg[i+2],ra=refImg[i+3];
+        if(ra<128){cx.fillStyle='rgba(255,0,0,0.5)';cx.fillRect(xx,yy,1,1);continue}
+        const th=40; // tolerance
+        if(Math.abs(rr-BR[0])<th&&Math.abs(rg-BR[1])<th&&Math.abs(rb-BR[2])<th){
+          cx.fillStyle='rgba(0,255,0,0.3)';cx.fillRect(xx,yy,1,1);
+        }else{
+          cx.fillStyle='rgba(255,0,0,0.5)';cx.fillRect(xx,yy,1,1);
         }
       }
       cx.fillStyle='#0f0';cx.font='10px monospace';
-      cx.fillText('COMPARE MODE  C: toggle   Green=ref+game match  Red=game pixel not in ref',5,15);
+      cx.fillText('C: toggle   Green=pixel match   Red=extra game pixel   Ref bg=no overlay',5,15);
       return;
     }
     if(st.mode===0){drawAttract();return}
@@ -375,6 +422,7 @@ function render(){
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
+    drawLadders();
     drawDK();
     drawGF();
     for(let o of st.obs)drawBarrel(o);
@@ -550,6 +598,7 @@ function drawAttract(){
     cx.fillStyle='rgb('+bg[0]+','+bg[1]+','+bg[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
+    drawLadders();
     drawDK();
     drawGF();
     const marMX=160+Math.floor(Math.sin(st.fr/30)*60);
@@ -558,12 +607,12 @@ function drawAttract(){
     cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
     cx.font='bold 20px monospace';
     cx.textAlign='center';
-    cx.fillText('DONKEY KONG',160,60);
+    cx.fillText('DONKEY KONG',160,25);
     cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
     cx.font='10px monospace';
-    if(Math.floor(st.fr/30)%2)cx.fillText('PRESS SPACE TO START',160,80);
+    if(Math.floor(st.fr/30)%2)cx.fillText('PRESS SPACE TO START',160,45);
     cx.fillStyle='rgb('+TQ[0]+','+TQ[1]+','+TQ[2]+')';
-    cx.fillText('ARROWS: MOVE  SPACE: JUMP',160,95);
+    cx.fillText('ARROWS: MOVE  SPACE: JUMP',160,60);
     cx.textAlign='left';
 }
 
