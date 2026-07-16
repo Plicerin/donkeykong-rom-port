@@ -157,9 +157,24 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
+// === LADDER POSITIONS (connecting walkways) ===
+// Derived from support posts visible in reference GIF platform data
+const LADDERS = [
+  {x:67, from:0, to:1},   // left post W0↔W1
+  {x:155, from:0, to:1},  // right post W0↔W1
+  {x:99, from:1, to:2},   // W1↔W2 left center
+  {x:139, from:1, to:2},  // W1↔W2 right center
+  {x:135, from:2, to:3},  // W2↔W3 (sweep overlap)
+  {x:131, from:3, to:4},  // W3↔W4 center post
+  {x:163, from:3, to:4},  // W3↔W4 right post
+  {x:99, from:4, to:5},   // W4↔W5 left
+  {x:147, from:4, to:5},  // W4↔W5 right
+];
+const LADDER_RANGE = 5;    // x tolerance to start climbing
+
 let st={mode:0,w:5,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
-        cl:0,ct:0,cx:0,bjc:0};
+        cl:0,clx:0,ct:0,bjc:0};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
 function loadRef(){
@@ -481,6 +496,22 @@ function update(){
                             if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,lc:0,ty:0,fb:Math.random()<0.1});
                         }
 
+    // === LADDER CLIMBING ===
+    // Check mid-climb state first (started on a previous frame)
+    if(st.cl!==0){
+        st.mx=st.clx; // lock horizontal position to ladder
+        const ty=wy(st.ct);
+        if(st.cl>0){ // climbing up
+            st.my--;
+            if(st.my<=ty){st.my=ty;st.w=st.ct;st.cl=0;st.flg=0;st.jht=0}
+        }else{ // climbing down
+            st.my++;
+            if(st.my>=ty){st.my=ty;st.w=st.ct;st.cl=0;st.flg=0;st.jht=0}
+        }
+        st.md=-1;
+        return; // exit update — climbing replaces grounded/jumping states
+    }
+
     // === PLAYER STATE MACHINE (only one state per frame) ===
     if(st.flg){
         // FALLING
@@ -513,6 +544,15 @@ function update(){
         }
     }else{
         // GROUNDED
+        // Check for ladder climbing initiation
+        if(keys['ArrowUp']&&st.cl===0){
+            const ladder=LADDERS.find(l=>l.to===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
+            if(ladder){st.cl=1;st.clx=ladder.x;st.ct=ladder.from;return}
+        }
+        if(keys['ArrowDown']&&st.cl===0){
+            const ladder=LADDERS.find(l=>l.from===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
+            if(ladder){st.cl=-1;st.clx=ladder.x;st.ct=ladder.to;return}
+        }
         // ASM MARIO_MOVE_RATE=$02: move 1px every 2 frames
         let dir=0xFF;
         if(--st.mr>0){/*skip movement this frame*/}else{st.mr=2;
