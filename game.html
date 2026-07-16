@@ -434,7 +434,7 @@ function update(){
 
                                 if(o.s===1){
                                     o.x+=o.d*spd;
-                                    if(o.w>=1&&o.w<=4){
+                                    if(o.w>=0&&o.w<=4){
                                         const rp=o.d>0?RAMP_X:RAMP_L;
                                         for(let ri=0;ri<7;ri++){
                                             const ex=o.d>0?o.x:o.x+1;
@@ -527,6 +527,7 @@ function update(){
                 if(dir===0xFD&&st.mx>0){st.mx--;st.md=0}
                 if(dir===0xFE&&st.mx<315){st.mx++;st.md=1}
             }
+        }
         if(!st.flg&&st.jht<=0){
             const pw=onPlatform(st.mx,st.my+2);
             if(pw>=0){st.w=pw;st.my=wy(pw);st.flg=0}
