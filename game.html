@@ -157,8 +157,8 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-let st={mode:0,w:5,mx:160,my:228,md:-1,lives:2,score:0,bt:80,obs:[],brs:80,
-        jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,
+let st={mode:0,w:5,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
+        jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
         cl:0,ct:0,cx:0,bjc:0};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
@@ -417,7 +417,9 @@ function update(){
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
 
-    // === BARRELS (run EVERY frame, regardless of Mario state) ===
+    // === BARRELS (run at half rate: ASM processes each barrel every 2 frames) ===
+    st.brc=1-st.brc;
+    if(st.brc){// skip barrel movement on alternating frames (ASM-style half-rate)
                             const RAMP_X=[112,145,173,203,233,263,293];
                             const RAMP_L=[44,77,105,135,165,195,225];
                             const LADDER_X=[[273,308],[123,203,88,308],[223,273,88,308],[123,163,173,183],[253,273],[193]];
@@ -471,6 +473,7 @@ function update(){
                                 }
                                 if(o.w===5&&o.x<92){o.a=false;st.score+=100;continue}
                             }
+                            } // end if(brc)
 
                 st.ot++;
                 if(st.ot%st.brs===0){
@@ -492,16 +495,17 @@ function update(){
             else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0;st.flg=0}
         }
     }else if(st.jht>0){
-        // JUMPING — parabolic arc
+        // JUMPING — ASM: JUMP_HANGTIME=$1F (31 frames), instant rise/fall
         st.jht--;
-        const jt=st.jht;
-        // Arc: rise for first 14 frames, fall for last 14
-        if(jt>14){st.my-=3}   // rising (4px/frame)
-        else{st.my+=3}        // falling (4px/frame)
-        let jdir=st.jht_dir;
-        if(jdir===0xFD&&st.mx>ZIG[st.w][0])st.mx-=2;
-        if(jdir===0xFE&&st.mx<ZIG[st.w][1])st.mx+=2;
+        // ASM-style: move horizontally at 1px/2frames during jump (same as grounded)
+        // Use mr counter for horizontal movement
+        if(--st.mr<=0){st.mr=2;
+            let jdir=st.jht_dir;
+            if(jdir===0xFD&&st.mx>ZIG[st.w][0])st.mx-=1;
+            if(jdir===0xFE&&st.mx<ZIG[st.w][1])st.mx+=1;
+        }
         if(st.jht<=0){
+            // ASM: fall back down by JUMPING_HEIGHT ($07)
             st.my=Math.min(st.my+7,255);
             const pw=onPlatform(st.mx,st.my);
             if(pw>=0){st.w=pw;st.my=wy(pw);st.jht=0;st.flg=0;st.md=st.jht_dir===0xFD?0:(st.jht_dir===0xFE?1:-1);}
@@ -509,7 +513,9 @@ function update(){
         }
     }else{
         // GROUNDED
-            let dir=0xFF;
+        // ASM MARIO_MOVE_RATE=$02: move 1px every 2 frames
+        let dir=0xFF;
+        if(--st.mr>0){/*skip movement this frame*/}else{st.mr=2;
             if(keys['ArrowLeft'])dir=0xFD;
             if(keys['ArrowRight'])dir=0xFE;
             const surf=ZIG[st.w];
@@ -528,7 +534,7 @@ function update(){
         }
         if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
         if((keys['Space']||keys['KeyZ'])&&st.hmt<=0){
-            st.jht=28;
+            st.jht=31; // ASM JUMP_HANGTIME=$1F
             st.jht_dir=st.md<0?0xFF:(st.md===0?0xFD:0xFE);
             st.my-=7;st.md=-1;sJ();
         }
@@ -597,12 +603,13 @@ function drawGO(){
 }
 
 function loop(){
-    if(!paused){update();render()}
+    // PAL 50fps: run game logic at 20ms intervals
+    // Use rAF for smooth rendering only
+    const now=performance.now();
+    if(now-lt>=20){lt=now;if(!paused){update();render()}}
     requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
-// Fallback in case rAF is throttled:
-if(!window._dkLoopFix){window._dkLoopFix=true;setInterval(function(){if(!paused){update();render()}},17)}
 </script>
 <script src="donkey-kong-bot.js"></script>
 </body>
