@@ -157,20 +157,24 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-// === LADDER POSITIONS (from PLAT_DATA support columns, ROM-verified) ===
-// Each column at these x-positions passes through both walkways' ZIG spans.
-// Center column at x=132 runs through all 6 walkways.
+// === LADDER positions (from PLAT_DATA support columns in ref.gif) ===
+// Column x=100 [96,103] connects W0↔W1↔W2 and W4↔W5 (blocked at W3: x=100 < 128)
+// Column x=132 [128,135] connects ALL 6 walkways
+// Column x=164 [160,167] connects W1↔W3(skip W2), W3↔W4, W4↔W5
+// Convention: from=higher walkway, to=lower walkway (from→to = going down)
 const LADDERS = [
-  {x:100, from:4, to:5},   // left column [96,103]: ground↔W4
-  {x:132, from:4, to:5},   // center column [128,135]: ground↔W4
-  {x:132, from:3, to:4},   // center column at [128,135]: W4↔W3
-  {x:132, from:2, to:3},   // center column: W3↔W2
-  {x:132, from:1, to:2},   // center column: W2↔W1
-  {x:132, from:0, to:1},   // center column: W1↔W0
-  {x:164, from:4, to:5},   // right column [160,167]: ground↔W4
-  {x:164, from:3, to:4},   // right column [160,167]: W4↔W3
+  // x=100: W0↔W1↔W2, then W4↔W5 (skips W3 since x=100 not on W3 surface [128,183])
+  {x:100, from:0, to:1}, {x:100, from:1, to:2},
+  {x:100, from:4, to:5},
+  // x=132: ALL adjacent walkways
+  {x:132, from:0, to:1}, {x:132, from:1, to:2},
+  {x:132, from:2, to:3}, {x:132, from:3, to:4},
+  {x:132, from:4, to:5},
+  // x=164: W3↔W4, W4↔W5, W1↔W3 (skip W2: x=164 not on W2 surface [96,143])
+  {x:164, from:1, to:3},
+  {x:164, from:3, to:4}, {x:164, from:4, to:5},
 ];
-const LADDER_RANGE = 24;
+const LADDER_RANGE = 6;
 
 let st={mode:0,w:5,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
@@ -406,12 +410,6 @@ function render(){
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
-    // Highlight ladder positions in red
-    cx.fillStyle='rgba(255,0,0,0.4)';
-    for(let l of LADDERS){
-        const ty=wy(l.from),by=wy(l.to);
-        cx.fillRect(l.x-1,Math.min(ty,by),3,Math.abs(ty-by)+2);
-    }
     drawDK();
     drawGF();
     for(let o of st.obs)drawBarrel(o);
