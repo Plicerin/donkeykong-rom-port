@@ -406,6 +406,12 @@ function render(){
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
+    // Highlight ladder positions in red
+    cx.fillStyle='rgba(255,0,0,0.4)';
+    for(let l of LADDERS){
+        const ty=wy(l.from),by=wy(l.to);
+        cx.fillRect(l.x-1,Math.min(ty,by),3,Math.abs(ty-by)+2);
+    }
     drawDK();
     drawGF();
     for(let o of st.obs)drawBarrel(o);
