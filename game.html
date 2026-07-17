@@ -157,20 +157,20 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-// === LADDER POSITIONS (connecting walkways) ===
-// Derived from support posts visible in reference GIF platform data
+// === LADDER POSITIONS (from PLAT_DATA support columns, ROM-verified) ===
+// Each column at these x-positions passes through both walkways' ZIG spans.
+// Center column at x=132 runs through all 6 walkways.
 const LADDERS = [
-  {x:67, from:0, to:1},   // left post W0↔W1
-  {x:155, from:0, to:1},  // right post W0↔W1
-  {x:99, from:1, to:2},   // W1↔W2 left center
-  {x:139, from:1, to:2},  // W1↔W2 right center
-  {x:135, from:2, to:3},  // W2↔W3 (sweep overlap)
-  {x:131, from:3, to:4},  // W3↔W4 center post
-  {x:163, from:3, to:4},  // W3↔W4 right post
-  {x:99, from:4, to:5},   // W4↔W5 left
-  {x:147, from:4, to:5},  // W4↔W5 right
+  {x:100, from:4, to:5},   // left column [96,103]: ground↔W4
+  {x:132, from:4, to:5},   // center column [128,135]: ground↔W4
+  {x:132, from:3, to:4},   // center column at [128,135]: W4↔W3
+  {x:132, from:2, to:3},   // center column: W3↔W2
+  {x:132, from:1, to:2},   // center column: W2↔W1
+  {x:132, from:0, to:1},   // center column: W1↔W0
+  {x:164, from:4, to:5},   // right column [160,167]: ground↔W4
+  {x:164, from:3, to:4},   // right column [160,167]: W4↔W3
 ];
-const LADDER_RANGE = 8;    // x tolerance to start climbing
+const LADDER_RANGE = 8;
 
 let st={mode:0,w:5,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
@@ -255,12 +255,6 @@ function drawPlats(){
         for(let sp of spans){
             dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
         }
-    }
-    // Draw ladder indicators
-    cx.fillStyle='rgba(0,200,200,0.3)';
-    for(let l of LADDERS){
-        const x=l.x, y0=wy(l.to), y1=wy(l.from)-1;
-        cx.fillRect(x-1,y0,3,y1-y0);
     }
 }
 
