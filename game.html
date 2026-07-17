@@ -163,23 +163,17 @@ const PLAT_DATA = {
 // ArrowUp: finds ladder where l.to===st.w, climbs to l.from
 // ArrowDown: finds ladder where l.from===st.w, descends to l.to
 const LADDERS = [
-  // x=68: column [64,71] — full-height left post, all walkways
+  // x=68 — leftmost structural column: full height, all walkways
   {x:68, from:0, to:1}, {x:68, from:1, to:2},
   {x:68, from:2, to:3}, {x:68, from:3, to:4}, {x:68, from:4, to:5},
-  // x=100: column [96,103] — center-left post, all walkways
-  {x:100, from:0, to:1}, {x:100, from:1, to:2},
-  {x:100, from:2, to:3}, {x:100, from:3, to:4}, {x:100, from:4, to:5},
-  // x=132: column [128,135] — center post, all walkways
+  // x=132 — center column: full height, all walkways
   {x:132, from:0, to:1}, {x:132, from:1, to:2},
   {x:132, from:2, to:3}, {x:132, from:3, to:4}, {x:132, from:4, to:5},
-  // x=155: edge post [152,159] W0-W1 + sweep column through W4-W5
+  // x=155 — edge post: W0↔W1 and W4↔W5
   {x:155, from:0, to:1}, {x:155, from:4, to:5},
-  // x=164: column [160,167] — right post through W3-W4-W5
-  {x:164, from:0, to:1}, {x:164, from:1, to:2},
-  {x:164, from:2, to:3}, {x:164, from:3, to:4}, {x:164, from:4, to:5},
-  // x=171: sweep column connects W4↔W5
+  // x=171 — sweep column: W4↔W5
   {x:171, from:4, to:5},
-  // x=193: sweep column connects W4↔W5
+  // x=193 — sweep column: W4↔W5
   {x:193, from:4, to:5},
 ];
 const LADDER_RANGE = 5;
