@@ -157,22 +157,20 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-// === LADDER positions (from PLAT_DATA support columns in ref.gif) ===
-// Column x=100 [96,103] connects W0↔W1↔W2 and W4↔W5 (blocked at W3: x=100 < 128)
-// Column x=132 [128,135] connects ALL 6 walkways
-// Column x=164 [160,167] connects W1↔W3(skip W2), W3↔W4, W4↔W5
+// === LADDER positions (from user's red marks on screenshot) ===
+// 6 ladder x-positions. Only adjacent walkway pairs that BOTH have
+// surface at that x can be climbed.
 // Convention: from=higher walkway, to=lower walkway (from→to = going down)
 const LADDERS = [
-  // x=100: W0↔W1↔W2, then W4↔W5 (skips W3 since x=100 not on W3 surface [128,183])
-  {x:100, from:0, to:1}, {x:100, from:1, to:2},
-  {x:100, from:4, to:5},
-  // x=132: ALL adjacent walkways
-  {x:132, from:0, to:1}, {x:132, from:1, to:2},
-  {x:132, from:2, to:3}, {x:132, from:3, to:4},
-  {x:132, from:4, to:5},
-  // x=164: W3↔W4, W4↔W5, W1↔W3 (skip W2: x=164 not on W2 surface [96,143])
-  {x:164, from:1, to:3},
-  {x:164, from:3, to:4}, {x:164, from:4, to:5},
+  // x=68: W0↔W1 (left post area)
+  {x:68, from:0, to:1},
+  // x=131: ALL 6 walkways (center column)
+  {x:131, from:0, to:1}, {x:131, from:1, to:2},
+  {x:131, from:2, to:3}, {x:131, from:3, to:4},
+  {x:131, from:4, to:5},
+  // x=156: W0↔W1, W3↔W4↔W5 (skips W2: 156 not in [96,143])
+  {x:156, from:0, to:1},
+  {x:156, from:3, to:4}, {x:156, from:4, to:5},
 ];
 const LADDER_RANGE = 6;
 
