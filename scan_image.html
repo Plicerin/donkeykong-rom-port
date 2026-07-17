@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html><head><title>Ladder Mapper</title></head>
+<body style="margin:0;background:#222;">
+<canvas id="c"></canvas>
+<script>
+const img=new Image();
+img.onload=function(){
+  const c=document.getElementById('c');
+  c.width=img.width; c.height=img.height;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(img,0,0);
+  const d=ctx.getImageData(0,0,img.width,img.height).data;
+  
+  // STEP 1: Find the Donkey Kong purple background to locate the game canvas in the screenshot
+  // The game uses PAL purple rgb(189,102,175) as its background
+  // Find leftmost/rightmost/topmost/bottommost purple pixels
+  let minX=img.width, maxX=0, minY=img.height, maxY=0;
+  for(let y=0;y<img.height;y++){
+    for(let x=0;x<img.width;x++){
+      const i=(y*img.width+x)*4;
+      const r=d[i], g=d[i+1], b=d[i+2];
+      // PAL purple: ~189,102,175
+      const isPurple = Math.abs(r-189)<30 && Math.abs(g-102)<30 && Math.abs(b-175)<30;
+      // Also look for the blue dpad (Mario) or other game content: any non-black, non-white
+      if(isPurple){
+        if(x<minX)minX=x; if(x>maxX)maxX=x;
+        if(y<minY)minY=y; if(y>maxY)maxY=y;
+      }
+    }
+  }
+  
+  ctx.fillStyle='cyan'; ctx.font='15px monospace'; ctx.strokeStyle='black'; ctx.lineWidth=2;
+  const info=`Game canvas bounds: (${minX},${minY}) to (${maxX},${maxY})  size=${maxX-minX}x${maxY-minY}`;
+  ctx.strokeText(info,10,15); ctx.fillText(info,10,15);
+  ctx.strokeStyle='cyan'; ctx.lineWidth=2; ctx.setLineDash([5,5]);
+  ctx.strokeRect(minX,minY,maxX-minX,maxY-minY);
+  ctx.setLineDash([]);
+  
+  // STEP 2: Find RED MARKER pixels inside the game canvas area
+  const scaleX = 320/(maxX-minX);
+  const cols={};
+  for(let x=minX;x<=maxX;x++){
+    let rc=0;
+    for(let y=minY;y<=maxY;y++){
+      const i=(y*img.width+x)*4;
+      const r=d[i], g=d[i+1], b=d[i+2];
+      // Red marker: distinct bright red
+      if(r>180 && g<140 && b<140 && r>g+b+20) rc++;
+    }
+    if(rc>5) cols[x]=rc;
+  }
+  
+  // Group
+  const groups=[];
+  let g=null;
+  const sorted=Object.keys(cols).map(Number).sort((a,b)=>a-b);
+  for(let x of sorted){
+    if(!g){g={start:x,end:x,total:cols[x]}}
+    else if(x-g.end<=3){g.end=x;g.total+=cols[x]}
+    else{groups.push(g);g={start:x,end:x,total:cols[x]}}
+  }
+  if(g)groups.push(g);
+  
+  // Draw markers and labels
+  ctx.fillStyle='white'; ctx.strokeStyle='black'; ctx.lineWidth=3; ctx.font='bold 14px monospace';
+  let yy=40;
+  for(let i=0;i<groups.length;i++){
+    const g=groups[i];
+    const scrnX=Math.round((g.start+g.end)/2);
+    const gameX=Math.round((scrnX-minX)*scaleX);
+    const label=`#${i+1} scrn:${scrnX} game:${gameX} (w:${g.end-g.start+1},px:${g.total})`;
+    ctx.strokeText(label,10,yy);
+    ctx.fillText(label,10,yy);
+    ctx.strokeStyle='lime'; ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(scrnX,minY);ctx.lineTo(scrnX,maxY);ctx.stroke();
+    ctx.fillStyle='red'; ctx.font='12px monospace';
+    ctx.strokeText('gx='+gameX,scrnX+3,minY+12);
+    ctx.fillText('gx='+gameX,scrnX+3,minY+12);
+    yy+=18;
+  }
+  
+  // Also draw crosshairs at each group center
+  ctx.strokeStyle='red'; ctx.lineWidth=1;
+  for(let g of groups){
+    const cx=Math.round((g.start+g.end)/2);
+    ctx.beginPath();ctx.moveTo(cx-5,0);ctx.lineTo(cx+5,0);
+    ctx.moveTo(cx,0-5);ctx.lineTo(cx,0+5);
+    ctx.stroke();
+  }
+  
+  window._info={minX,maxX,minY,maxY,scaleX,groups};
+};
+img.src='user_image.png?'+Date.now();
+</script></body></html>
