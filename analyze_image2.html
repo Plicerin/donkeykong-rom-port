@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head><title>Image Coordinates</title>
+<style>
+  body{margin:0;background:#222;color:#fff;font:14px monospace;display:flex;align-items:flex-start}
+  #wrap{position:relative;display:inline-block}
+  canvas{position:absolute;top:0;left:0;image-rendering:pixelated}
+  #info{width:500px;padding:10px;overflow-y:auto;max-height:100vh}
+  .row{cursor:pointer;padding:2px}
+  .row:hover{background:#444}
+  .active{background:#060}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <img id="src" src="user_image.png" style="image-rendering:pixelated;display:block">
+  <canvas id="ov"></canvas>
+</div>
+<div id="info">
+  <p><b>Click a line below or click the image</b></p>
+  <div id="res"></div>
+</div>
+<script>
+const img=document.getElementById('src');
+const c=document.getElementById('ov');
+const ctx=c.getContext('2d');
+img.onload=()=>{
+  c.width=img.naturalWidth;
+  c.height=img.naturalHeight;
+  ctx.drawImage(img,0,0);
+  // SCAN for red using MULTIPLE thresholds
+  const d=ctx.getImageData(0,0,c.width,c.height);
+  const groups=[];
+  
+  // Scan for R>180 and R>2*G and R>2*B (catches various reds)
+  const colCounts=[];
+  for(let x=0;x<c.width;x++){
+    const rows=[];
+    for(let y=0;y<c.height;y++){
+      const i=(y*c.width+x)*4;
+      const r=d.data[i],g=d.data[i+1],b=d.data[i+2];
+      if(r>180 && r>g*2 && r>b*2){
+        rows.push(y);
+      }
+    }
+    if(rows.length>30) colCounts.push({x,count:rows.length,ymin:rows[0],ymax:rows[rows.length-1]});
+  }
+  
+  // Group neighboring columns
+  let cur=null;
+  for(let cc of colCounts){
+    if(!cur||cc.x>cur.x+3){
+      cur={xmin:cc.x,xmax:cc.x,count:cc.count,ymin:cc.ymin,ymax:cc.ymax};
+      groups.push(cur);
+    }else{
+      cur.xmax=cc.x;
+      cur.count=Math.max(cur.count,cc.count);
+      cur.ymin=Math.min(cur.ymin,cc.ymin);
+      cur.ymax=Math.max(cur.ymax,cc.ymax);
+    }
+  }
+  
+  // Draw markers  
+  ctx.strokeStyle='lime';ctx.lineWidth=1;
+  for(let g of groups){
+    const cx=Math.round((g.xmin+g.xmax)/2);
+    const gameX=Math.round(cx*320/c.width);
+    ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,c.height);ctx.stroke();
+  }
+  
+  // Build info
+  document.getElementById('res').innerHTML='<b>Detected '+groups.length+' red groups (R>180, R>2G, R>2B, >30px):</b><br>'+
+    groups.map((g,i)=>{
+      const cx=Math.round((g.xmin+g.xmax)/2);
+      const gx=Math.round(cx*320/c.width);
+      return '<div class=row onclick="showCol('+cx+')">['+i+'] img_x='+cx+' (span '+
+        g.xmin+'-'+g.xmax+') game_x='+gx+' y='+g.ymin+'-'+g.ymax+
+        ' count='+g.count+'</div>';
+    }).join('');
+};
+
+function showCol(cx){
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.drawImage(img,0,0);
+  // All groups in green
+  const d=ctx.getImageData(0,0,c.width,c.height);
+  const groups=[];
+  const colCounts=[];
+  for(let x=0;x<c.width;x++){
+    let rows=0,ymin=1e9,ymax=-1;
+    for(let y=0;y<c.height;y++){
+      const i=(y*c.width+x)*4;
+      const r=d.data[i],g=d.data[i+1],b=d.data[i+2];
+      if(r>180&&r>g*2&&r>b*2){rows++;ymin=Math.min(ymin,y);ymax=Math.max(ymax,y);}
+    }
+    if(rows>30)colCounts.push({x,rows,ymin,ymax});
+  }
+  let cur=null;
+  for(let cc of colCounts){
+    if(!cur||cc.x>cur.x+3){
+      cur={xmin:cc.x,xmax:cc.x};groups.push(cur);
+    }else{cur.xmax=cc.x}
+  }
+  ctx.strokeStyle='lime';ctx.lineWidth=1;
+  for(let g of groups){
+    const cx2=Math.round((g.xmin+g.xmax)/2);
+    ctx.beginPath();ctx.moveTo(cx2,0);ctx.lineTo(cx2,c.height);ctx.stroke();
+  }
+  // Selected in red
+  ctx.strokeStyle='red';ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,c.height);ctx.stroke();
+  
+  // Read pixel at center
+  const y=c.height/2|0;
+  const i=(y*c.width+cx)*4;
+  const r=d.data[i],g=d.data[i+1],b=d.data[i+2];
+  document.getElementById('res').innerHTML+='<br><b>Selected x='+cx+
+    ' game_x='+Math.round(cx*320/c.width)+
+    ' RGB('+r+','+g+','+b+')</b>';
+}
+
+img.onclick=(e)=>{
+  const rect=c.getBoundingClientRect();
+  const sx=e.clientX-rect.left,sy=e.clientY-rect.top;
+  const ix=Math.round(sx*c.width/rect.width);
+  const iy=Math.round(sy*c.height/rect.height);
+  showCol(ix);
+};
+</script>
+</body>
+</html>

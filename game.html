@@ -157,21 +157,32 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-// === LADDER positions (from user's red marks on screenshot) ===
-// 6 ladder x-positions. Only adjacent walkway pairs that BOTH have
-// surface at that x can be climbed.
-// Convention: from=higher walkway, to=lower walkway (from→to = going down)
+// === LADDER positions (from user's red marks + PLAT_DATA columns) ===
+// Convention: from=higher walkway (smaller y, higher on screen),
+//             to=lower walkway (larger y, lower on screen).
+// ArrowUp: finds ladder where l.to===st.w, climbs to l.from
+// ArrowDown: finds ladder where l.from===st.w, descends to l.to
 const LADDERS = [
-  // === ROM-accurate ladder positions (from donkey_kong_2600.asm LadderHorizValues) ===
-  // x=88 ($23=35): connects W0↔W1 only (left support post)
-  {x:88, from:0, to:1},
-  // x=122 ($31=49): connects W0↔W1, W1↔W2, W4↔W5 (center-left column)
-  {x:122, from:0, to:1}, {x:122, from:1, to:2},
-  {x:122, from:4, to:5},
-  // x=162 ($41=65): connects W3↔W4, W4↔W5 (right column, skip W2 at 162 not in [96,143])
-  {x:162, from:3, to:4}, {x:162, from:4, to:5},
+  // x=68: column [64,71] — full-height left post, all walkways
+  {x:68, from:0, to:1}, {x:68, from:1, to:2},
+  {x:68, from:2, to:3}, {x:68, from:3, to:4}, {x:68, from:4, to:5},
+  // x=100: column [96,103] — center-left post, all walkways
+  {x:100, from:0, to:1}, {x:100, from:1, to:2},
+  {x:100, from:2, to:3}, {x:100, from:3, to:4}, {x:100, from:4, to:5},
+  // x=132: column [128,135] — center post, all walkways
+  {x:132, from:0, to:1}, {x:132, from:1, to:2},
+  {x:132, from:2, to:3}, {x:132, from:3, to:4}, {x:132, from:4, to:5},
+  // x=155: edge post [152,159] W0-W1 + sweep column through W4-W5
+  {x:155, from:0, to:1}, {x:155, from:4, to:5},
+  // x=164: column [160,167] — right post through W3-W4-W5
+  {x:164, from:0, to:1}, {x:164, from:1, to:2},
+  {x:164, from:2, to:3}, {x:164, from:3, to:4}, {x:164, from:4, to:5},
+  // x=171: sweep column connects W4↔W5
+  {x:171, from:4, to:5},
+  // x=193: sweep column connects W4↔W5
+  {x:193, from:4, to:5},
 ];
-const LADDER_RANGE = 3;
+const LADDER_RANGE = 5;
 
 let st={mode:0,w:5,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
