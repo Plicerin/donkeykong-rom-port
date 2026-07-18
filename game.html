@@ -197,7 +197,7 @@ const LADDER_RANGE = 5;
 
 let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
-        cl:0,clx:0,ct:0,bjc:0};
+        cl:0,clx:0,ct:0,bjc:0,bonus:5000,wt:0,level:1};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
 function loadRef(){
@@ -439,6 +439,7 @@ function render(){
     }
     if(st.mode===0){drawAttract();return}
     if(st.mode===1){drawGO();return}
+    if(st.mode===2){drawWin();return}
     if(st.mode!==128)return;
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,320,240);
@@ -451,6 +452,16 @@ function render(){
     drawScore();
     drawBJCount();
     drawLives();
+    drawBonus();
+}
+
+function drawBonus(){
+    cx.fillStyle='rgb('+W[0]+','+W[1]+','+W[2]+')';
+    cx.font='8px monospace';
+    cx.textAlign='left';
+    cx.fillText('BONUS '+st.bonus,4,10);
+    cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
+    cx.fillText('L'+st.level,4,20);
 }
 
 function onPlatform(mx,my){
@@ -466,10 +477,35 @@ function update(){
     st.fr++;
     if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false}return}
     if(st.mode===1){st.got++;if(st.got>120){st.mode=0;st.lives=2;st.score=0;st.bt=80;
-        st.w=6;st.mx=160;st.my=228;st.obs=[];st.ot=0}return}
+        st.w=6;st.mx=160;st.my=228;st.obs=[];st.ot=0;st.bonus=5000;st.level=1}return}
+    if(st.mode===2){st.wt++;if(st.wt>150){
+        // next level: fresh board, keep score+lives, reset positions & bonus
+        st.level++;st.mode=128;st.w=6;st.mx=160;st.my=228;st.md=-1;st.obs=[];st.ot=0;
+        st.flg=0;st.jht=0;st.cl=0;st.dcd=0;st.bonus=5000;st.fr=0}return}
     if(st.mode!==128)return;
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
+
+    // === BONUS TIMER (arcade DK: counts down; reaching 0 kills Mario) ===
+    if((st.fr&7)===0){
+        st.bonus-=100;
+        if(st.bonus<=0){
+            st.bonus=0;
+            st.lives--;sD();
+            if(st.lives<=0){st.mode=1;st.got=0}
+            else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.flg=0;st.bonus=5000}
+            return;
+        }
+    }
+
+    // === WIN: Mario reaches the top walkway (w0) where DK & Pauline are ===
+    if(st.w===0 && st.cl===0){
+        st.score+=st.bonus;   // award remaining bonus (arcade level-complete payout)
+        st.bonus=0;
+        st.mode=2;st.wt=0;
+        sL();
+        return;
+    }
 
     // === BARRELS (run at half rate: ASM processes each barrel every 2 frames) ===
     st.brc=1-st.brc;
@@ -722,6 +758,28 @@ function drawGO(){
     cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
     cx.font='10px monospace';
     if(Math.floor(st.fr/30)%2)cx.fillText('PRESS SPACE TO RESTART',160,130);
+    cx.textAlign='left';
+}
+
+function drawWin(){
+    cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
+    cx.fillRect(0,0,320,240);
+    // show the board with a heart between Mario and Pauline
+    drawPlats();
+    drawGF();
+    cx.fillStyle='rgb('+W[0]+','+W[1]+','+W[2]+')';
+    cx.font='bold 16px monospace';
+    cx.textAlign='center';
+    cx.fillText('LEVEL '+st.level+' CLEARED!',160,90);
+    cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
+    cx.font='10px monospace';
+    cx.fillText('SCORE  '+st.score,160,112);
+    // pulsing heart
+    if(Math.floor(st.fr/8)%2){
+        cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
+        cx.font='20px monospace';
+        cx.fillText('\u2665',160,140);
+    }
     cx.textAlign='left';
 }
 
