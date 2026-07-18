@@ -503,36 +503,31 @@ function update(){
                                     // it takes the nearest ladder there (forced) so it never rolls off
                                     // into space and never reverses without a ladder.
                                     if(o.w<6 && !(o.grace>0)){
-                                        const lx=LADDER_X[o.w]||[];
+                                        const lx=(LADDER_X[o.w]||[]).slice().sort((a,b)=>a-b);
                                         const nx=o.w+1;
                                         const rb=Math.min(BARREL_RB[o.w],BARREL_RB[nx]);
                                         const lb=Math.max(BARREL_LB[o.w],BARREL_LB[nx]);
-                                        const atEnd=(o.d>0)?(o.x>=rb):(o.x<=lb);
                                         let descend=false;
-                                        // ladder column encountered mid-girder: random descent
+                                        // Descend when the barrel actually REACHES a ladder column
+                                        // (within a few px). Small score-gated chance to skip a ladder
+                                        // and roll on to the next one — never teleport to it.
                                         for(let li=0;li<lx.length;li++){
-                                            if(Math.abs(o.x-lx[li])<2 && o.lastlad!==lx[li]){
+                                            if(Math.abs(o.x-lx[li])<=2 && o.lastlad!==lx[li]){
                                                 o.lastlad=lx[li];
-                                                const p=Math.min(0.65,0.35+st.score/9000);
-                                                if(Math.random()<p) descend=true;
+                                                // if this is the LAST ladder in the roll direction, always
+                                                // take it (otherwise the barrel would roll off the end)
+                                                const isLastInDir=(o.d>0)?(lx[li]>=lx[lx.length-1]-2):(lx[li]<=lx[0]+2);
+                                                const p=Math.min(0.85,0.5+st.score/8000);
+                                                if(isLastInDir||Math.random()<p) descend=true;
                                                 break;
                                             }
                                         }
-                                        // reached the end without descending: forced descent via the
-                                        // nearest ladder so the barrel keeps going DOWN, not off-screen.
-                                        if(atEnd) descend=true;
                                         if(descend){
                                             o.ty=nx;
-                                            o.edge=0;          // ALL descents are ladder descents
-                                            // snap onto the ladder column nearest the barrel
-                                            if(lx.length){
-                                                let best=lx[0];
-                                                for(const c of lx) if(Math.abs(c-o.x)<Math.abs(best-o.x)) best=c;
-                                                o.x=best;
-                                            }
+                                            o.edge=0;   // all descents are ladder descents (x unchanged)
                                             o.s=2;
                                         }
-                                        if(o.lastlad!==undefined && Math.abs(o.x-o.lastlad)>=3)o.lastlad=undefined;
+                                        if(o.lastlad!==undefined && Math.abs(o.x-o.lastlad)>=4)o.lastlad=undefined;
                                     }
                                     if(o.grace>0)o.grace--;
                                 }else if(o.s===2){
@@ -541,16 +536,15 @@ function update(){
                                     o.y+=3;
                                     if(o.y>=wy(o.ty,o.x)){
                                         o.w=o.ty;
-                                        if(o.edge===0){
-                                            // LADDER descent -> flip horizontal direction (ASM eor RIGHT).
-                                            o.d=-o.d;
-                                            o.x+=o.d*3;   // step off the ladder column in the new dir
-                                        }else{
-                                            // GIRDER-END roll-off -> KEEP horizontal direction and
-                                            // KEEP x (girders overlap where they meet). Just clamp a
-                                            // couple px inside the new girder so it stays on surface.
-                                            o.x=Math.max(BARREL_LB[o.w]+3,Math.min(BARREL_RB[o.w]-3,o.x));
-                                        }
+                                        // Set roll direction by GRAVITY: a barrel always rolls toward
+                                        // the LOWER end of the girder it lands on (never uphill). Since
+                                        // consecutive girders slant opposite ways, this also produces the
+                                        // ASM zigzag (direction alternates each level) — but it can never
+                                        // send a barrel up a slope after a ladder.
+                                        const g=GEO[o.w<6?o.w:6];
+                                        if(g[3]>g[2]) o.d=1;        // right end lower -> roll RIGHT
+                                        else if(g[3]<g[2]) o.d=-1;  // left end lower  -> roll LEFT
+                                        // (flat girder: keep whatever direction it had)
                                         o.y=wy(o.w<6?o.w:6,o.x);
                                         o.s=1;
                                         o.grace=6;
