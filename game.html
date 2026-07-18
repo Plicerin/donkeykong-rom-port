@@ -482,7 +482,6 @@ function update(){
                             const BARREL_LB=[64,64,80,64,80,64,64];
                             const BARREL_RB=[159,239,255,239,255,239,255];
 
-                            st.brs=Math.min(40,80-Math.floor(st.score/300));
                             for(let i=st.obs.length-1;i>=0;i--){
                                 const o=st.obs[i];
                                 if(!o.a){st.obs.splice(i,1);continue}
@@ -561,10 +560,23 @@ function update(){
                             } // end if(brc)
 
                 st.ot++;
-                if(st.ot%st.brs===0){
-                            const act=st.obs.filter(o=>o.a);
-                            if(act.length<4){const sx=92+Math.floor(Math.random()*8);st.obs.push({x:sx,y:wy(0,sx),w:0,d:1,s:1,a:true,lc:0,ty:0,fb:Math.random()<0.1})}
+                // ===== ROM-accurate barrel spawn (StartNewBarrel, overscan slot pool) =====
+                // The ROM has MAX_OBSTACLES=4 slots. Each frame it services ONE slot; if that
+                // slot is empty it spawns a new barrel ONLY once the previously-thrown barrel has
+                // descended past the top-platform threshold (vertPos>=$23, i.e. it has left the
+                // top girder). There is NO frame timer and NO score scaling — spawn cadence is
+                // purely: free slot + the last barrel has rolled off the top platform.
+                {
+                    const act=st.obs.filter(o=>o.a);
+                    if(act.length<4){
+                        // newest barrel = the one most recently spawned (still on top girder?)
+                        const onTop=act.some(o=>o.w===0);
+                        if(!onTop){
+                            const sx=92+Math.floor(Math.random()*8);
+                            st.obs.push({x:sx,y:wy(0,sx),w:0,d:1,s:1,a:true,lc:0,ty:0,edge:0,grace:0,fb:Math.random()<0.1});
                         }
+                    }
+                }
 
     // === LADDER CLIMBING ===
     // Check mid-climb state first (started on a previous frame)
