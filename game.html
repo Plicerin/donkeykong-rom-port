@@ -681,6 +681,8 @@ function update(){
             if(Math.abs(st.mx-o.x)<6&&st.my<o.y-12){
                 o.bj=1;
                 st.bjc++;
+                st.score+=100;   // jumping a barrel scores 100 (arcade DK)
+                sW();            // jump-success blip
             }
         }
     }
