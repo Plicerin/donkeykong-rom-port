@@ -482,30 +482,38 @@ function update(){
                                     o.x+=o.d*spd;
                                     // sit on the slanted girder surface as it rolls
                                     if(o.w<6)o.y=wy(o.w,o.x);
-                                    if(o.w>=0&&o.w<=5){
-                                        const rp=o.d>0?RAMP_X:RAMP_L;
-                                        for(let ri=0;ri<7;ri++){
-                                            const ex=o.d>0?o.x:o.x+1;
-                                            if(ex===rp[ri]){o.y+=1;break}
-                                        }
-                                    }
+
+                                    // --- LADDER DESCENT: score-gated random, only at valid ladder columns ---
+                                    // (ASM: randomSeed vs LF900[score] gate, then exact-x ladder match;
+                                    //  barrels randomly go down certain ladders, not every one.)
                                     if(o.w<6){
-                                    o.lc=(o.lc||0)+1;
-                                    if(o.lc>=12){
-                                        o.lc=0;
                                         const lx=LADDER_X[o.w];
                                         if(lx){
                                             for(let li=0;li<lx.length;li++){
-                                                if(Math.abs(o.x-lx[li])<4){
-                                                    o.ty=o.w+1;
-                                                    o.s=2;
+                                                // only consider a ladder once per approach (o.lx guards re-trigger)
+                                                if(Math.abs(o.x-lx[li])<2 && o.lastlad!==lx[li]){
+                                                    o.lastlad=lx[li];
+                                                    // descent probability rises with score (ASM LF900 table trend);
+                                                    // base ~35%, capped ~70%. Bottom ladder to ground is rarer.
+                                                    const p=Math.min(0.7,0.35+st.score/6000);
+                                                    if(Math.random()<p){
+                                                        o.ty=o.w+1;
+                                                        o.edge=0;      // ladder drop (not an edge fall)
+                                                        o.s=2;
+                                                    }
                                                     break;
                                                 }
                                             }
+                                            // clear the guard once the barrel has rolled off this ladder column
+                                            if(o.lastlad!==undefined && Math.abs(o.x-o.lastlad)>=3)o.lastlad=undefined;
                                         }
                                     }
-                                    }
-                                    if(o.w<6&&(o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
+
+                                    // --- GIRDER END: roll off the edge down to the NEXT girder only ---
+                                    // Persistent direction: barrel keeps rolling until it reaches a girder
+                                    // end, then drops ONE level. Top platform (w=0) drops to w=1 — never
+                                    // shortcuts to the ground.
+                                    if(o.s===1 && o.w<6 && (o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
                                         o.ty=o.w+1;
                                         o.edge=(o.x<BARREL_LB[o.w])?-1:1; // which edge it fell off
                                         o.s=2;
