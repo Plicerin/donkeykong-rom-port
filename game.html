@@ -486,8 +486,8 @@ function update(){
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
 
-    // === BONUS TIMER (arcade DK: counts down; reaching 0 kills Mario) ===
-    if((st.fr&7)===0){
+    // === BONUS TIMER (arcade DK: ~1 decrement per second; reaching 0 kills Mario) ===
+    if(st.fr%50===0){
         st.bonus-=100;
         if(st.bonus<=0){
             st.bonus=0;
