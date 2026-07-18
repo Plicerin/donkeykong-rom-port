@@ -40,6 +40,16 @@ const GEO=[
   [64,255,228,228], // GND flat (index 6 = ground, Mario start)
 ];
 const NW=7;
+// Downhill roll direction per girder from its slant (GEO[w]=[xL,xR,yL,yR]).
+// yR>yL => lower on the right => rolls RIGHT (+1); yR<yL => rolls LEFT (-1);
+// flat girders (W0,W1,GND) return 0 = keep current direction.
+function downhillDir(w){
+  if(w<0||w>6)return 0;
+  const g=GEO[w];const dy=g[3]-g[2];
+  if(dy>0)return 1;    // lower to the right -> roll right
+  if(dy<0)return -1;   // lower to the left  -> roll left
+  return 0;            // flat
+}
 // surface y of walkway w at horizontal x (clamped to girder span)
 function wy(w,x){
   const g=GEO[w];
@@ -493,9 +503,11 @@ function update(){
                                                 // only consider a ladder once per approach (o.lx guards re-trigger)
                                                 if(Math.abs(o.x-lx[li])<2 && o.lastlad!==lx[li]){
                                                     o.lastlad=lx[li];
-                                                    // descent probability rises with score (ASM LF900 table trend);
-                                                    // base ~35%, capped ~70%. Bottom ladder to ground is rarer.
-                                                    const p=Math.min(0.7,0.35+st.score/6000);
+                                                    // descent probability (ASM LF900 trend): keep it
+                                                    // LOW so barrels usually roll PAST ladders and off
+                                                    // the girder end; only sometimes drop. Rises slowly
+                                                    // with score. ~25% base -> ~45% cap.
+                                                    const p=Math.min(0.45,0.25+st.score/12000);
                                                     if(Math.random()<p){
                                                         o.ty=o.w+1;
                                                         o.edge=0;      // ladder drop (not an edge fall)
@@ -522,14 +534,19 @@ function update(){
                                     o.y+=2;
                                     if(o.y>=wy(o.ty,o.x)){
                                         o.w=o.ty;
-                                        // Land just INSIDE the new walkway on the edge it fell off,
-                                        // then roll INWARD so it crosses the girder (real DK behavior).
-                                        if(o.edge===-1){o.x=BARREL_LB[o.w]+2;o.d=1;}      // fell off left -> roll right
-                                        else if(o.edge===1){o.x=BARREL_RB[o.w]-2;o.d=-1;} // fell off right -> roll left
+                                        // Land just INSIDE the new girder on the edge it dropped from,
+                                        // then roll DOWNHILL (slant-driven). Flat girders keep the
+                                        // inward direction from the drop. This gives the fixed
+                                        // per-girder roll direction real DK barrels have.
+                                        if(o.edge===-1){o.x=BARREL_LB[o.w]+2;o.d=1;}      // dropped off left edge
+                                        else if(o.edge===1){o.x=BARREL_RB[o.w]-2;o.d=-1;} // dropped off right edge
                                         else{o.d=-o.d;}                                    // ladder drop -> reverse
+                                        const dh=downhillDir(o.w);
+                                        if(dh!==0)o.d=dh;                                  // slanted girder -> roll downhill
                                         o.y=wy(o.w<6?o.w:6,o.x);
                                         o.s=1;
                                         o.lc=0;
+                                        o.lastlad=undefined;   // allow ladder decisions on the new girder
                                         o.edge=0;
                                     }
                                 }
