@@ -479,8 +479,8 @@ function update(){
                             // Barrel descent ladders = SAME drawn posts Mario climbs
                             // (pixel-measured post centers per walkway gap). Index = walkway o.w.
                             const LADDER_X=[[68,156],[120,220],[100,140],[180,220],[100,164],[80,220]];
-                            const BARREL_LB=[64,64,80,64,80,64];
-                            const BARREL_RB=[159,239,255,239,255,239];
+                            const BARREL_LB=[64,64,80,64,80,64,64];
+                            const BARREL_RB=[159,239,255,239,255,239,255];
 
                             st.brs=Math.min(40,80-Math.floor(st.score/300));
                             for(let i=st.obs.length-1;i>=0;i--){
@@ -534,15 +534,22 @@ function update(){
                                     o.y+=2;
                                     if(o.y>=wy(o.ty,o.x)){
                                         o.w=o.ty;
-                                        // Land just INSIDE the new girder on the edge it dropped from,
-                                        // then roll DOWNHILL (slant-driven). Flat girders keep the
-                                        // inward direction from the drop. This gives the fixed
-                                        // per-girder roll direction real DK barrels have.
-                                        if(o.edge===-1){o.x=BARREL_LB[o.w]+2;o.d=1;}      // dropped off left edge
-                                        else if(o.edge===1){o.x=BARREL_RB[o.w]-2;o.d=-1;} // dropped off right edge
-                                        else{o.d=-o.d;}                                    // ladder drop -> reverse
-                                        const dh=downhillDir(o.w);
-                                        if(dh!==0)o.d=dh;                                  // slanted girder -> roll downhill
+                                        // ASM MoveBarrelObject: a barrel keeps its horizontal
+                                        // direction across girder transitions. It reverses ONLY
+                                        // when it descends a LADDER (eor OBSTACLE_MOVING_RIGHT at
+                                        // $F551). Rolling off a girder END does NOT reverse it —
+                                        // the barrel continues the same way onto the next girder.
+                                        if(o.edge===0){
+                                            // ladder drop -> flip horizontal direction (ASM eor RIGHT)
+                                            o.d=-o.d;
+                                            o.x+=o.d*2;   // nudge inward off the ladder column
+                                        }else{
+                                            // edge drop -> KEEP horizontal direction. The girders
+                                            // overlap at their ends, so the barrel lands at ~the same
+                                            // x on the next girder and continues the same way. Clamp
+                                            // just inside the new girder's span so it can roll on.
+                                            o.x=Math.max(BARREL_LB[o.w]+2,Math.min(BARREL_RB[o.w]-2,o.x));
+                                        }
                                         o.y=wy(o.w<6?o.w:6,o.x);
                                         o.s=1;
                                         o.lc=0;
@@ -550,7 +557,9 @@ function update(){
                                         o.edge=0;
                                     }
                                 }
-                                if(o.w===6&&o.x<92){o.a=false;st.score+=100;continue}
+                                // Ground exit: barrel rolls off either end of the bottom platform
+                                // and is retired (ASM: barrel done at XMIN off-screen).
+                                if(o.w===6&&(o.x<92||o.x>BARREL_RB[6])){o.a=false;st.score+=100;continue}
                             }
                             } // end if(brc)
 
