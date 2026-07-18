@@ -308,8 +308,12 @@ function drawGF(){
 function drawBarrel(o){
     const col=o.fb?[40,100,255]:O;
     const top=o.y-8;
-    if(o.s===2){dS(BAR_FALL,o.x,top,col);return}
-    dS(Math.floor(st.fr/3)%2?BAR:BAR2,o.x,top,col);
+    // dS() draws from the sprite's LEFT edge; o.x is the barrel's CENTER (and the
+    // ladder-column x it descends on). Offset by -4 (half the 8px sprite) so the
+    // barrel renders centered on the ladder instead of 4px to the right.
+    const dx=o.x-4;
+    if(o.s===2){dS(BAR_FALL,dx,top,col);return}
+    dS(Math.floor(st.fr/3)%2?BAR:BAR2,dx,top,col);
 }
 
 const NFO=[
@@ -553,13 +557,18 @@ function update(){
                                                 // take it (otherwise the barrel would roll off the end)
                                                 const isLastInDir=(o.d>0)?(lx[li]>=lx[lx.length-1]-2):(lx[li]<=lx[0]+2);
                                                 const p=Math.min(0.85,0.5+st.score/8000);
-                                                if(isLastInDir||Math.random()<p) descend=true;
+                                                if(isLastInDir||Math.random()<p){descend=true;o.lx=lx[li];}
                                                 break;
                                             }
                                         }
                                         if(descend){
                                             o.ty=nx;
                                             o.edge=0;   // all descents are ladder descents (x unchanged)
+                                            // ROM: barrel descends at the EXACT ladder column (horPos never
+                                            // changes during descent, and descent only triggers on an exact
+                                            // horPos match). Snap x to the ladder center so the barrel rides
+                                            // straight down the middle of the ladder, not 1-2px to the side.
+                                            o.x=o.lx;
                                             o.s=2;
                                         }
                                         if(o.lastlad!==undefined && Math.abs(o.x-o.lastlad)>=4)o.lastlad=undefined;
