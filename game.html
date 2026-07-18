@@ -542,9 +542,10 @@ function update(){
                                         // ASM zigzag (direction alternates each level) — but it can never
                                         // send a barrel up a slope after a ladder.
                                         const g=GEO[o.w<6?o.w:6];
-                                        if(g[3]>g[2]) o.d=1;        // right end lower -> roll RIGHT
+                                        if(o.w===6) o.d=-1;         // GROUND: ROM checkBarrelDone -> barrels roll LEFT to exit at XMIN
+                                        else if(g[3]>g[2]) o.d=1;   // right end lower -> roll RIGHT
                                         else if(g[3]<g[2]) o.d=-1;  // left end lower  -> roll LEFT
-                                        // (flat girder: keep whatever direction it had)
+                                        // (flat mid girder: keep whatever direction it had)
                                         o.y=wy(o.w<6?o.w:6,o.x);
                                         o.s=1;
                                         o.grace=6;
@@ -553,9 +554,9 @@ function update(){
                                         o.edge=0;
                                     }
                                 }
-                                // Ground exit: barrel rolls off either end of the bottom platform
-                                // and is retired (ASM: barrel done at XMIN off-screen).
-                                if(o.w===6&&(o.x<92||o.x>BARREL_RB[6])){o.a=false;st.score+=100;continue}
+                                // Ground exit: ROM .checkBarrelDone retires the barrel when it reaches
+                                // the LEFT edge (XMIN_LEVEL1-1). Barrels roll left off the bottom.
+                                if(o.w===6&&o.x<92){o.a=false;st.score+=100;continue}
                             }
                             } // end if(brc)
 
