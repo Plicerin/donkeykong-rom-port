@@ -168,20 +168,22 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-// === LADDER positions (extracted from ref.gif — see LEVEL_GEOMETRY.md) ===
-// Each ladder connects ONE adjacent walkway pair. from=upper (smaller index),
-// to=lower (larger index). Staggered as in the real arcade layout.
+// === LADDER positions — DESIGNATE the horizontal-line "post" clusters that
+// drawPlats() already renders as climbable. x = center of each post column.
+// Extracted directly from PLAT_DATA post rows (the stacks of short horizontal
+// segments between walkways). Nothing is drawn for ladders; these just mark
+// which x-columns are climbable and which walkway pair they connect.
 // ArrowUp: finds ladder where l.to===st.w, climbs to l.from.
 // ArrowDown: finds ladder where l.from===st.w, descends to l.to.
 const LADDERS = [
-  {x:67,  from:0, to:1}, {x:155, from:0, to:1},   // W0 <-> W1
-  {x:119, from:1, to:2}, {x:219, from:1, to:2},   // W1 <-> W2
-  {x:99,  from:2, to:3}, {x:139, from:2, to:3},   // W2 <-> W3
-  {x:179, from:3, to:4}, {x:219, from:3, to:4},   // W3 <-> W4
-  {x:99,  from:4, to:5}, {x:163, from:4, to:5},   // W4 <-> W5
-  {x:79,  from:5, to:6}, {x:219, from:5, to:6},   // W5 <-> GND
+  {x:67,  from:0, to:1}, {x:155, from:0, to:1},                  // W0<->W1 posts y75-91: [64,71],[152,159]
+  {x:99,  from:1, to:2}, {x:139, from:1, to:2}, {x:203, from:1, to:2}, // W1<->W2 posts y131-143: [96,103],[136,143],[200,207]
+  {x:131, from:2, to:3}, {x:179, from:2, to:3}, {x:219, from:2, to:3}, // W2<->W3 posts y159-171: [128,135],[176,183],[216,223]
+  {x:99,  from:3, to:4}, {x:163, from:3, to:4},                  // W3<->W4 posts y187-199: [96,103],[160,167]
+  {x:147, from:4, to:5}, {x:219, from:4, to:5},                  // W4<->W5 posts y215-227: [144,151],[216,223]
+  {x:79,  from:5, to:6}, {x:147, from:5, to:6}, {x:219, from:5, to:6}, // W5<->GND lower posts y215-227: [72,87],[144,151],[216,223]
 ];
-const LADDER_RANGE = 4;
+const LADDER_RANGE = 5;
 
 let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
@@ -270,19 +272,9 @@ function drawPlats(){
 }
 
 function drawLadders(){
-    // Real Atari 2600 DK: ladders are NOT cyan rails. They are short stacks of
-    // horizontal purple rungs (same color as the platforms), centered on the
-    // ladder x, connecting the upper girder down to the lower girder.
-    const LAD=BR; // same purple as platforms
-    for(const l of LADDERS){
-        const up=Math.min(l.from,l.to);
-        const dn=Math.max(l.from,l.to);
-        const yTop=wy(up,l.x);
-        const yBot=wy(dn,l.x);
-        const x=l.x-3;   // rung left edge (7px wide, centered on l.x)
-        // horizontal rungs every 3px down the gap
-        for(let y=yTop+2;y<yBot;y+=3)dR(x,y,7,1,LAD);
-    }
+    // Ladders are NOT drawn here. The climbable rungs are the horizontal lines
+    // already rendered by drawPlats(). The LADDERS array only DESIGNATES which
+    // x-columns are climbable and which walkways they connect — it draws nothing.
 }
 function drawDK(){
     const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
