@@ -26,18 +26,29 @@ const B=[0,0,0];        // black
 const BG=[30,130,130];  // background teal
 const LG=[160,230,60];  // lime
 
-// Walkway y-positions (from reference GIF at native 320x240)
-const WY=[70,95,131,155,183,228];
-const NW=6;
-function wy(w){return WY[w]}
-
-// Walkway surface x-ranges (from reference color scan)
-// W0: full surface [64-159], between edge posts [72-151]
-// W1: posts at [96-103,136-143], gap between = [104-135] 
-// W2: posts at [128-135,176-183], gap = [136-175]
-// W3: posts at [96-103,160-167], gap = [104-159]
-// Ground: full surface [64-255]
-const ZIG=[[64,159],[64,239],[96,143],[128,183],[96,167],[64,255]];
+// === AUTHORITATIVE GEOMETRY (extracted from ref.gif — see LEVEL_GEOMETRY.md) ===
+// 7 surfaces: W0 (top) .. W5, then GND (index 6, where Mario starts).
+// Each is a (possibly slanted) girder. surface y is linear in x.
+// GEO[w] = [xL, xR, yL, yR]  (surface y at xL is yL, at xR is yR)
+const GEO=[
+  [64,159,70,70],   // W0 flat (top, DK)
+  [64,239,95,95],   // W1 flat
+  [80,255,123,116], // W2 slants up-right
+  [64,239,144,151], // W3 slants down-right
+  [80,255,179,172], // W4 slants up-right
+  [64,239,200,207], // W5 slants down-right
+  [64,255,228,228], // GND flat (index 6 = ground, Mario start)
+];
+const NW=7;
+// surface y of walkway w at horizontal x (clamped to girder span)
+function wy(w,x){
+  const g=GEO[w];
+  if(x===undefined)x=g[0]; // legacy calls without x -> left edge
+  let xx=x; if(xx<g[0])xx=g[0]; if(xx>g[1])xx=g[1];
+  return Math.round(g[2]+(g[3]-g[2])*(xx-g[0])/(g[1]-g[0]));
+}
+// x-span of each walkway surface
+const ZIG=[[64,159],[64,239],[80,255],[64,239],[80,255],[64,239],[64,255]];
 
 // Diagonal sweep connector data (connecting walkways)
 // Generated from reference — these create the diagonal girder transitions
@@ -157,36 +168,22 @@ const PLAT_DATA = {
   229: [[64,255]],
 };
 
-// === LADDER positions (from user's red marks + PLAT_DATA columns) ===
-// Convention: from=higher walkway (smaller y, higher on screen),
-//             to=lower walkway (larger y, lower on screen).
-// ArrowUp: finds ladder where l.to===st.w, climbs to l.from
-// ArrowDown: finds ladder where l.from===st.w, descends to l.to
+// === LADDER positions (extracted from ref.gif — see LEVEL_GEOMETRY.md) ===
+// Each ladder connects ONE adjacent walkway pair. from=upper (smaller index),
+// to=lower (larger index). Staggered as in the real arcade layout.
+// ArrowUp: finds ladder where l.to===st.w, climbs to l.from.
+// ArrowDown: finds ladder where l.from===st.w, descends to l.to.
 const LADDERS = [
-  // Left structural column — user's mark at x=63, surface edge at x=64
-  // ROM $23=35 (DOWN W2/W1). Marker spans x=54-73.
-  {x:64, from:0, to:1},  // W0↔W1 (top two walkways)
-  {x:64, from:1, to:5},  // W1↔W5 (through mid walkways)
-  // Center column — user's mark at x=127, W3 surface starts at x=128
-  // ROM $41=65 (UP W3). Full height at this x.
-  {x:128, from:0, to:1}, {x:128, from:1, to:2},
-  {x:128, from:2, to:3}, {x:128, from:3, to:4}, {x:128, from:4, to:5},
-  // Sweep column — user's mark at x=153, matches ROM $4D=77
-  // Surface: W0,W1,W3,W4,W5 (W2=[96,143] excludes 153)
-  {x:153, from:0, to:1}, {x:153, from:3, to:4}, {x:153, from:4, to:5},
-  // Right sweep — user's mark at x=169
-  // Surface: W1=[64,239], W3=[128,183], W5=[64,255]
-  {x:169, from:1, to:3}, {x:169, from:3, to:5},
-  // Far right — user's mark at x=194
-  // Surface: W1=[64,239], W5=[64,255]
-  {x:194, from:1, to:5},
-  // Right edge column — user's mark at x=260 (off all surfaces)
-  // W5 surface ends at 255, this is structural only — set at surface edge
-  {x:255, from:0, to:5},
+  {x:67,  from:0, to:1}, {x:155, from:0, to:1},   // W0 <-> W1
+  {x:119, from:1, to:2}, {x:219, from:1, to:2},   // W1 <-> W2
+  {x:99,  from:2, to:3}, {x:139, from:2, to:3},   // W2 <-> W3
+  {x:179, from:3, to:4}, {x:219, from:3, to:4},   // W3 <-> W4
+  {x:99,  from:4, to:5}, {x:163, from:4, to:5},   // W4 <-> W5
+  {x:79,  from:5, to:6}, {x:219, from:5, to:6},   // W5 <-> GND
 ];
-const LADDER_RANGE = 5;
+const LADDER_RANGE = 4;
 
-let st={mode:0,w:5,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
+let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
         cl:0,clx:0,ct:0,bjc:0};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
@@ -272,6 +269,24 @@ function drawPlats(){
     }
 }
 
+function drawLadders(){
+    // Draw each ladder as two vertical rails + rungs, spanning from the upper
+    // walkway (l.from) surface down to the lower walkway (l.to) surface.
+    // Ladder x is the LEFT rail; right rail is x+6. Cyan like the arcade.
+    const LAD=[121,205,255]; // ladder color (light cyan)
+    for(const l of LADDERS){
+        const up=Math.min(l.from,l.to);   // higher walkway (smaller wy index = higher on screen)
+        const dn=Math.max(l.from,l.to);
+        const yTop=wy(up,l.x);             // top of ladder (upper walkway surface)
+        const yBot=wy(dn,l.x);             // bottom of ladder (lower walkway surface)
+        const x=l.x-3;                     // left rail (center the 7px-wide ladder on l.x)
+        // rails
+        dR(x,yTop,1,yBot-yTop,LAD);
+        dR(x+6,yTop,1,yBot-yTop,LAD);
+        // rungs every 4px
+        for(let y=yTop+2;y<yBot;y+=4)dR(x,y,7,1,LAD);
+    }
+}
 function drawDK(){
     const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
     // DK sitting on top walkway — bottom of sprite touches platform top
@@ -420,6 +435,7 @@ function render(){
     cx.fillStyle='rgb('+B[0]+','+B[1]+','+B[2]+')';
     cx.fillRect(0,0,320,240);
     drawPlats();
+    drawLadders();
     drawDK();
     drawGF();
     for(let o of st.obs)drawBarrel(o);
@@ -432,7 +448,8 @@ function render(){
 function onPlatform(mx,my){
     for(let w=0;w<NW;w++){
         const surf=ZIG[w];
-        if(mx>=surf[0]&&mx<=surf[1]&&my>=wy(w)&&my<wy(w)+4)return w;
+        const gy=wy(w,mx);
+        if(mx>=surf[0]&&mx<=surf[1]&&my>=gy&&my<gy+4)return w;
     }
     return -1;
 }
@@ -441,7 +458,7 @@ function update(){
     st.fr++;
     if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false}return}
     if(st.mode===1){st.got++;if(st.got>120){st.mode=0;st.lives=2;st.score=0;st.bt=80;
-        st.w=5;st.mx=160;st.my=228;st.obs=[];st.ot=0}return}
+        st.w=6;st.mx=160;st.my=228;st.obs=[];st.ot=0}return}
     if(st.mode!==128)return;
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
@@ -451,9 +468,10 @@ function update(){
     if(st.brc){// skip barrel movement on alternating frames (ASM-style half-rate)
                             const RAMP_X=[112,145,173,203,233,263,293];
                             const RAMP_L=[44,77,105,135,165,195,225];
-                            const LADDER_X=[[273,308],[123,203,88,308],[223,273,88,308],[123,163,173,183],[253,273],[193]];
-                            const BARREL_LB=[92,90,90,90,92,92];
-                            const BARREL_RB=[320,310,310,310,310,310];
+                            // Barrel descent ladders per walkway (from ref.gif ladder x by upper walkway)
+                            const LADDER_X=[[67,155],[119,219],[99,139],[179,219],[99,163],[79,219]];
+                            const BARREL_LB=[64,64,80,64,80,64];
+                            const BARREL_RB=[159,239,255,239,255,239];
 
                             st.brs=Math.min(40,80-Math.floor(st.score/300));
                             for(let i=st.obs.length-1;i>=0;i--){
@@ -463,14 +481,16 @@ function update(){
 
                                 if(o.s===1){
                                     o.x+=o.d*spd;
-                                    if(o.w>=0&&o.w<=4){
+                                    // sit on the slanted girder surface as it rolls
+                                    if(o.w<6)o.y=wy(o.w,o.x);
+                                    if(o.w>=0&&o.w<=5){
                                         const rp=o.d>0?RAMP_X:RAMP_L;
                                         for(let ri=0;ri<7;ri++){
                                             const ex=o.d>0?o.x:o.x+1;
                                             if(ex===rp[ri]){o.y+=1;break}
                                         }
                                     }
-                                    if(o.w<5){
+                                    if(o.w<6){
                                     o.lc=(o.lc||0)+1;
                                     if(o.lc>=12){
                                         o.lc=0;
@@ -486,35 +506,35 @@ function update(){
                                         }
                                     }
                                     }
-                                    if(o.w<5&&(o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
+                                    if(o.w<6&&(o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
                                         o.ty=o.w+1;
                                         o.s=2;
                                     }
                                 }else if(o.s===2){
                                     o.y+=2;
-                                    if(o.y>=wy(o.ty)){
-                                        o.y=wy(o.ty);
+                                    if(o.y>=wy(o.ty,o.x)){
+                                        o.y=wy(o.ty,o.x);
                                         o.w=o.ty;
                                         o.s=1;
                                         o.d=-o.d;
                                         o.lc=0;
                                     }
                                 }
-                                if(o.w===5&&o.x<92){o.a=false;st.score+=100;continue}
+                                if(o.w===6&&o.x<92){o.a=false;st.score+=100;continue}
                             }
                             } // end if(brc)
 
                 st.ot++;
                 if(st.ot%st.brs===0){
                             const act=st.obs.filter(o=>o.a);
-                            if(act.length<4)st.obs.push({x:92+Math.floor(Math.random()*8),y:wy(0),w:0,d:1,s:1,a:true,lc:0,ty:0,fb:Math.random()<0.1});
+                            if(act.length<4){const sx=92+Math.floor(Math.random()*8);st.obs.push({x:sx,y:wy(0,sx),w:0,d:1,s:1,a:true,lc:0,ty:0,fb:Math.random()<0.1})}
                         }
 
     // === LADDER CLIMBING ===
     // Check mid-climb state first (started on a previous frame)
     if(st.cl!==0){
         st.mx=st.clx; // lock horizontal position to ladder
-        const ty=wy(st.ct);
+        const ty=wy(st.ct,st.clx);
         if(st.cl>0){ // climbing up
             st.my--;
             if(st.my<=ty){st.my=ty;st.w=st.ct;st.cl=0;st.flg=0;st.jht=0}
@@ -532,12 +552,12 @@ function update(){
         st.my+=2;
         const pw=onPlatform(st.mx,st.my);
         if(pw>=0){
-            st.w=pw;st.my=wy(pw);st.flg=0;st.jht=0;
+            st.w=pw;st.my=wy(pw,st.mx);st.flg=0;st.jht=0;
         }
-        if(st.my>wy(5)+20){
+        if(st.my>wy(6,st.mx)+20){
             st.lives--;sD();
             if(st.lives<=0){st.mode=1;st.got=0}
-            else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0;st.flg=0}
+            else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.flg=0}
         }
     }else if(st.jht>0){
         // JUMPING — ASM: JUMP_HANGTIME=$1F (31 frames), instant rise/fall
@@ -553,7 +573,7 @@ function update(){
             // ASM: fall back down by JUMPING_HEIGHT ($07)
             st.my=Math.min(st.my+7,255);
             const pw=onPlatform(st.mx,st.my);
-            if(pw>=0){st.w=pw;st.my=wy(pw);st.jht=0;st.flg=0;st.md=st.jht_dir===0xFD?0:(st.jht_dir===0xFE?1:-1);}
+            if(pw>=0){st.w=pw;st.my=wy(pw,st.mx);st.jht=0;st.flg=0;st.md=st.jht_dir===0xFD?0:(st.jht_dir===0xFE?1:-1);}
             else{st.flg=1;}
         }
     }else{
@@ -574,18 +594,15 @@ function update(){
             if(keys['ArrowRight'])dir=0xFE;
             const surf=ZIG[st.w];
             const leftB=surf[0],rightB=surf[1];
-            if(st.w===5){
-                if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
-                if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
-            }else{
-                if(dir===0xFD&&st.mx>0){st.mx--;st.md=0}
-                if(dir===0xFE&&st.mx<315){st.mx++;st.md=1}
-            }
+            if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
+            if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
         }
+        // stick to the slanted surface as Mario walks along the girder
         if(!st.flg&&st.jht<=0){
-            const pw=onPlatform(st.mx,st.my+2);
-            if(pw>=0){st.w=pw;st.my=wy(pw);st.flg=0}
-            else{st.my+=2;st.flg=1}
+            const gy=wy(st.w,st.mx);
+            const pw=onPlatform(st.mx,gy+2);
+            if(pw>=0){st.w=pw;st.my=wy(pw,st.mx);st.flg=0}
+            else{st.my=gy;}
         }
         if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
         if((keys['Space']||keys['KeyZ'])&&st.hmt<=0){
@@ -602,7 +619,7 @@ function update(){
             if(Math.abs(st.mx-o.x)<6&&Math.abs(st.my-o.y)<12){
                 st.lives--;sD();
                 if(st.lives<=0){st.mode=1;st.got=0}
-                else{st.dcd=120;st.my=228;st.mx=160;st.w=5;st.md=-1;st.jht=0}
+                else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0}
                 break;
             }
         }
@@ -630,7 +647,7 @@ function drawAttract(){
     drawDK();
     drawGF();
     const marMX=160+Math.floor(Math.sin(st.fr/30)*60);
-    const marMY=wy(5)-16;
+    const marMY=wy(6,marMX)-16;
     dS(MARIO_S,marMX,marMY,R);
     cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
     cx.font='bold 20px monospace';
