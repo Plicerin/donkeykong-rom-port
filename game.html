@@ -176,12 +176,12 @@ const PLAT_DATA = {
 // ArrowUp: finds ladder where l.to===st.w, climbs to l.from.
 // ArrowDown: finds ladder where l.from===st.w, descends to l.to.
 const LADDERS = [
-  {x:67,  from:0, to:1}, {x:155, from:0, to:1},                  // W0<->W1 posts y75-91: [64,71],[152,159]
-  {x:99,  from:1, to:2}, {x:139, from:1, to:2}, {x:203, from:1, to:2}, // W1<->W2 posts y131-143: [96,103],[136,143],[200,207]
-  {x:131, from:2, to:3}, {x:179, from:2, to:3}, {x:219, from:2, to:3}, // W2<->W3 posts y159-171: [128,135],[176,183],[216,223]
-  {x:99,  from:3, to:4}, {x:163, from:3, to:4},                  // W3<->W4 posts y187-199: [96,103],[160,167]
-  {x:147, from:4, to:5}, {x:219, from:4, to:5},                  // W4<->W5 posts y215-227: [144,151],[216,223]
-  {x:79,  from:5, to:6}, {x:147, from:5, to:6}, {x:219, from:5, to:6}, // W5<->GND lower posts y215-227: [72,87],[144,151],[216,223]
+  {x:68,  from:0, to:1}, {x:156, from:0, to:1},   // gap0 W0<->W1: measured 68,156
+  {x:120, from:1, to:2}, {x:220, from:1, to:2},   // gap1 W1<->W2: measured 120,220
+  {x:100, from:2, to:3}, {x:140, from:2, to:3},   // gap2 W2<->W3: measured 100,140
+  {x:180, from:3, to:4}, {x:220, from:3, to:4},   // gap3 W3<->W4: measured 180,220
+  {x:100, from:4, to:5}, {x:164, from:4, to:5},   // gap4 W4<->W5: measured 100,164
+  {x:80,  from:5, to:6}, {x:220, from:5, to:6},   // gap5 W5<->GND: measured 80,220
 ];
 const LADDER_RANGE = 5;
 
@@ -335,7 +335,8 @@ function drawMario(){
         sp=isLeft?MARIO_S:MARIO_S_L;
         topOff=18;
     }
-    const mx=st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx);
+    // st.mx is Mario's CENTER; sprite is 8px wide, dS draws from left edge -> shift left 4px
+    const mx=(st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx))-4;
     const my=st.my-topOff;
     dS(sp,mx,my,R);
 }
