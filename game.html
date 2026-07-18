@@ -270,21 +270,18 @@ function drawPlats(){
 }
 
 function drawLadders(){
-    // Draw each ladder as two vertical rails + rungs, spanning from the upper
-    // walkway (l.from) surface down to the lower walkway (l.to) surface.
-    // Ladder x is the LEFT rail; right rail is x+6. Cyan like the arcade.
-    const LAD=[121,205,255]; // ladder color (light cyan)
+    // Real Atari 2600 DK: ladders are NOT cyan rails. They are short stacks of
+    // horizontal purple rungs (same color as the platforms), centered on the
+    // ladder x, connecting the upper girder down to the lower girder.
+    const LAD=BR; // same purple as platforms
     for(const l of LADDERS){
-        const up=Math.min(l.from,l.to);   // higher walkway (smaller wy index = higher on screen)
+        const up=Math.min(l.from,l.to);
         const dn=Math.max(l.from,l.to);
-        const yTop=wy(up,l.x);             // top of ladder (upper walkway surface)
-        const yBot=wy(dn,l.x);             // bottom of ladder (lower walkway surface)
-        const x=l.x-3;                     // left rail (center the 7px-wide ladder on l.x)
-        // rails
-        dR(x,yTop,1,yBot-yTop,LAD);
-        dR(x+6,yTop,1,yBot-yTop,LAD);
-        // rungs every 4px
-        for(let y=yTop+2;y<yBot;y+=4)dR(x,y,7,1,LAD);
+        const yTop=wy(up,l.x);
+        const yBot=wy(dn,l.x);
+        const x=l.x-3;   // rung left edge (7px wide, centered on l.x)
+        // horizontal rungs every 3px down the gap
+        for(let y=yTop+2;y<yBot;y+=3)dR(x,y,7,1,LAD);
     }
 }
 function drawDK(){
