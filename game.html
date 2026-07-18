@@ -466,8 +466,9 @@ function update(){
     if(st.brc){// skip barrel movement on alternating frames (ASM-style half-rate)
                             const RAMP_X=[112,145,173,203,233,263,293];
                             const RAMP_L=[44,77,105,135,165,195,225];
-                            // Barrel descent ladders per walkway (from ref.gif ladder x by upper walkway)
-                            const LADDER_X=[[67,155],[119,219],[99,139],[179,219],[99,163],[79,219]];
+                            // Barrel descent ladders = SAME drawn posts Mario climbs
+                            // (pixel-measured post centers per walkway gap). Index = walkway o.w.
+                            const LADDER_X=[[68,156],[120,220],[100,140],[180,220],[100,164],[80,220]];
                             const BARREL_LB=[64,64,80,64,80,64];
                             const BARREL_RB=[159,239,255,239,255,239];
 
@@ -506,16 +507,22 @@ function update(){
                                     }
                                     if(o.w<6&&(o.x>BARREL_RB[o.w]||o.x<BARREL_LB[o.w])){
                                         o.ty=o.w+1;
+                                        o.edge=(o.x<BARREL_LB[o.w])?-1:1; // which edge it fell off
                                         o.s=2;
                                     }
                                 }else if(o.s===2){
                                     o.y+=2;
                                     if(o.y>=wy(o.ty,o.x)){
-                                        o.y=wy(o.ty,o.x);
                                         o.w=o.ty;
+                                        // Land just INSIDE the new walkway on the edge it fell off,
+                                        // then roll INWARD so it crosses the girder (real DK behavior).
+                                        if(o.edge===-1){o.x=BARREL_LB[o.w]+2;o.d=1;}      // fell off left -> roll right
+                                        else if(o.edge===1){o.x=BARREL_RB[o.w]-2;o.d=-1;} // fell off right -> roll left
+                                        else{o.d=-o.d;}                                    // ladder drop -> reverse
+                                        o.y=wy(o.w<6?o.w:6,o.x);
                                         o.s=1;
-                                        o.d=-o.d;
                                         o.lc=0;
+                                        o.edge=0;
                                     }
                                 }
                                 if(o.w===6&&o.x<92){o.a=false;st.score+=100;continue}
