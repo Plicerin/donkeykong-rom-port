@@ -197,7 +197,13 @@ const LADDER_RANGE = 5;
 
 let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
-        cl:0,clx:0,ct:0,bjc:0,bonus:5000,wt:0,level:1};
+        cl:0,clx:0,ct:0,bjc:0,bonus:5000,wt:0,level:1,
+        ham:0,hamt:0};   // ham=hammer active timer(frames); hamt=swing anim phase
+// HAMMER pickup object: fixed on the board (walkway W3). Mario grabs it by touching
+// it; it then swings beside him for a few seconds, smashing any barrel it hits.
+// ROM: HAMMER_GROUP walkway, hammerTime=MAX_HAMMER_TIME(3) slow-ticks, smash=800pts.
+const HAMMER={w:3,x:150,taken:false};
+const HAMMER_DURATION=350;   // ~7s at 50fps (ROM MAX_HAMMER_TIME=3 slow-ticks ≈ several sec)
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
 function loadRef(){
@@ -457,6 +463,32 @@ function render(){
     drawBJCount();
     drawLives();
     drawBonus();
+    drawHammer();
+}
+
+// 8x13 hammer: a handle with a heavy head. Rendered brown handle + grey head.
+function drawHammer(){
+    // Pickup on the board (not yet grabbed): sits on its walkway.
+    if(!HAMMER.taken && st.ham<=0){
+        const hy=wy(HAMMER.w,HAMMER.x);
+        drawHammerSprite(HAMMER.x, hy-13, 0);
+        return;
+    }
+    // Active: swings beside Mario on the side he faces, bobbing up/down.
+    if(st.ham>0){
+        const face=st.md<0?-1:1;
+        const bob=(Math.floor(st.hamt/4)%2)?0:3;   // simple 2-frame swing
+        const hx=st.mx+face*8;
+        drawHammerSprite(hx, st.my-18+bob, face);
+    }
+}
+function drawHammerSprite(cx0,top,face){
+    // head (grey block) + handle (brown). cx0 = center x.
+    const HD=[200,200,210], HN=[150,90,30];
+    // head: 8x5 block at top
+    for(let r=0;r<5;r++)for(let c=0;c<8;c++)dR(cx0-4+c,top+r,1,1,HD);
+    // handle: 2px wide, 8px tall, below head, centered
+    for(let r=5;r<13;r++)for(let c=0;c<2;c++)dR(cx0-1+c,top+r,1,1,HN);
 }
 
 function drawBonus(){
@@ -481,11 +513,11 @@ function update(){
     st.fr++;
     if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false}return}
     if(st.mode===1){st.got++;if(st.got>120){st.mode=0;st.lives=2;st.score=0;st.bt=80;
-        st.w=6;st.mx=160;st.my=228;st.obs=[];st.ot=0;st.bonus=5000;st.level=1}return}
+        st.w=6;st.mx=160;st.my=228;st.obs=[];st.ot=0;st.bonus=5000;st.level=1;HAMMER.taken=false;st.ham=0;st.hamt=0}return}
     if(st.mode===2){st.wt++;if(st.wt>150){
         // next level: fresh board, keep score+lives, reset positions & bonus
         st.level++;st.mode=128;st.w=6;st.mx=160;st.my=228;st.md=-1;st.obs=[];st.ot=0;
-        st.flg=0;st.jht=0;st.cl=0;st.dcd=0;st.bonus=5000;st.fr=0}return}
+        st.flg=0;st.jht=0;st.cl=0;st.dcd=0;st.bonus=5000;st.fr=0;HAMMER.taken=false;st.ham=0;st.hamt=0}return}
     if(st.mode!==128)return;
     if(st.dcd>0){st.dcd--;return}
     st.bt--;if(st.bt<=0){st.bt=80;sS()}
@@ -497,9 +529,22 @@ function update(){
             st.bonus=0;
             st.lives--;sD();
             if(st.lives<=0){st.mode=1;st.got=0}
-            else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.flg=0;st.bonus=5000}
+            else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.flg=0;st.bonus=5000;st.ham=0;st.hamt=0}
             return;
         }
+    }
+
+    // === HAMMER: pickup + active timer ===
+    // Pickup: Mario stands on the hammer's walkway near its x (and not mid-climb).
+    if(!HAMMER.taken && st.ham<=0 && st.cl===0 && st.w===HAMMER.w && Math.abs(st.mx-HAMMER.x)<8){
+        HAMMER.taken=true;
+        st.ham=HAMMER_DURATION;
+        sJ();   // grab blip
+    }
+    if(st.ham>0){
+        st.ham--;
+        st.hamt++;                 // drive the swing animation
+        if(st.ham<=0){st.hamt=0;}  // hammer expires
     }
 
     // === WIN: Mario reaches the top walkway (w0) where DK & Pauline are ===
@@ -672,12 +717,13 @@ function update(){
         }
     }else{
         // GROUNDED
-        // Check for ladder climbing initiation
-        if(keys['ArrowUp']&&st.cl===0){
+        // Check for ladder climbing initiation (blocked while carrying the hammer,
+        // per ROM: hammerTime!=0 skips ladder movement).
+        if(keys['ArrowUp']&&st.cl===0&&st.ham<=0){
             const ladder=LADDERS.find(l=>l.to===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
             if(ladder){st.cl=1;st.clx=ladder.x;st.ct=ladder.from;return}
         }
-        if(keys['ArrowDown']&&st.cl===0){
+        if(keys['ArrowDown']&&st.cl===0&&st.ham<=0){
             const ladder=LADDERS.find(l=>l.from===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
             if(ladder){st.cl=-1;st.clx=ladder.x;st.ct=ladder.to;return}
         }
@@ -706,14 +752,33 @@ function update(){
         }
     }
 
+    // === HAMMER SMASH: active hammer destroys barrels it overlaps (ROM: +800) ===
+    if(st.ham>0){
+        // Hammer occupies a zone in front of Mario (the side he faces) plus his own
+        // cell, roughly Mario's vertical level. Swing bob is cosmetic.
+        const face=st.md<0?-1:1;              // -1 faces left, +1 faces right
+        const hx=st.mx+face*10;               // hammer head ~10px in front
+        for(let o of st.obs){
+            if(!o.a)continue;
+            const dx=Math.min(Math.abs(o.x-hx),Math.abs(o.x-st.mx));
+            if(dx<9 && Math.abs(st.my-o.y)<14){
+                o.a=false;              // smash the barrel
+                st.score+=800;          // ROM SMASHING_OBSTACLE = 800 pts
+                sW();
+            }
+        }
+    }
+
     // === COLLISION & JUMP COUNTER (after all movement) ===
-    if(!st.dcd&&st.jht<=0&&!st.flg){
+    // While the hammer is active Mario is invulnerable to barrels (they get smashed
+    // above, or pass under the swing) — skip the death check.
+    if(!st.dcd&&st.jht<=0&&!st.flg&&st.ham<=0){
         for(let o of st.obs){
             if(!o.a)continue;
             if(Math.abs(st.mx-o.x)<6&&Math.abs(st.my-o.y)<12){
                 st.lives--;sD();
                 if(st.lives<=0){st.mode=1;st.got=0}
-                else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0}
+                else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.ham=0;st.hamt=0}
                 break;
             }
         }
