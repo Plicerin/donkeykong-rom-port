@@ -199,10 +199,11 @@ let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
         jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
         cl:0,clx:0,ct:0,bjc:0,bonus:5000,wt:0,level:1,
         ham:0,hamt:0};   // ham=hammer active timer(frames); hamt=swing anim phase
-// HAMMER pickup object: fixed on the board (walkway W3). Mario grabs it by touching
-// it; it then swings beside him for a few seconds, smashing any barrel it hits.
-// ROM: HAMMER_GROUP walkway, hammerTime=MAX_HAMMER_TIME(3) slow-ticks, smash=800pts.
-const HAMMER={w:3,x:150,taken:false};
+// HAMMER pickup object: fixed on the board. ROM HAMMER_GROUP=$04 = the lowest
+// girder band (of NUM_WALKWAYS=5), which is my walkway w5 (just above the ground).
+// Placed center-ish, clear of w5's ladders (x=80,100,164,220) so grabbing it
+// doesn't collide with climbing.
+const HAMMER={w:5,x:130,taken:false};
 const HAMMER_DURATION=350;   // ~7s at 50fps (ROM MAX_HAMMER_TIME=3 slow-ticks ≈ several sec)
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
