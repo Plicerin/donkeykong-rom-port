@@ -16,12 +16,14 @@ const cv=document.getElementById('c');const cx=cv.getContext('2d');
 
 // PAL TIA colors (reference: donkey_kong_pal_6.gif)
 const BR=[189,102,175]; // platform purple
-const TQ=[0,200,200];   // cyan/ladder
-const O=[180,60,0];     // orange/DK
-const R=[200,40,40];    // red/Mario
-const YL=[180,160,30];  // yellow/Pauline hair
-const W=[255,255,255];  // white
-const BL=[0,70,170];    // blue
+const TQ=[0,200,200];   // cyan/ladder / girlfriend dress (TURQUISE)
+const O=[180,60,0];     // orange/barrels (ORANGE)
+const BN=[160,90,40];   // DK brown (BROWN)
+const R=[200,40,40];    // red/Mario body + sash (RED/SASH_RED)
+const YL=[180,160,30];  // yellow/blonde hair / shoes
+const W=[255,255,255];  // white/Mario face
+const BL=[0,70,170];    // blue (UI)
+const BG_M=[40,160,140];// Mario boots (BLUE_GREEN)
 const B=[0,0,0];        // black
 const BG=[30,130,130];  // background teal
 const LG=[160,230,60];  // lime
@@ -44,19 +46,23 @@ const NW=7;
 // yR>yL => lower on the right => rolls RIGHT (+1); yR<yL => rolls LEFT (-1);
 // flat girders (W0,W1,GND) return 0 = keep current direction.
 function downhillDir(w){
-  if(w<0||w>6)return 0;
-  const g=GEO[w];const dy=g[3]-g[2];
+  const G=geo();
+  if(w<0||w>=G.length)return 0;
+  const g=G[w];const dy=g[3]-g[2];
   if(dy>0)return 1;    // lower to the right -> roll right
   if(dy<0)return -1;   // lower to the left  -> roll left
   return 0;            // flat
 }
 // surface y of walkway w at horizontal x (clamped to girder span)
+// Uses current screen geometry (barrel GEO vs L2 GEO2).
 function wy(w,x){
-  const g=GEO[w];
+  const G=geo();
+  const g=G[Math.max(0,Math.min(w,G.length-1))];
   if(x===undefined)x=g[0]; // legacy calls without x -> left edge
   let xx=x; if(xx<g[0])xx=g[0]; if(xx>g[1])xx=g[1];
   return Math.round(g[2]+(g[3]-g[2])*(xx-g[0])/(g[1]-g[0]));
 }
+function groundW(){return nW()-1;}
 // x-span of each walkway surface
 const ZIG=[[64,159],[64,239],[80,255],[64,239],[80,255],[64,239],[64,255]];
 
@@ -195,16 +201,188 @@ const LADDERS = [
 ];
 const LADDER_RANGE = 5;
 
-let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
-        jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
-        cl:0,clx:0,ct:0,bjc:0,bonus:5000,wt:0,level:1,
-        ham:0,hamt:0};   // ham=hammer active timer(frames); hamt=swing anim phase
+// === LEVEL 2: Firefox / Rivets (ASM gameScreen=1) ===
+// Geometry from A26_02.gif (640x420 → 320x240) + ASM rivet/ladder constants.
+// 6 flat girders: top (DK) + 4 rivet floors + bottom (start, no rivets).
+// ASM: no rivits on walkway #$01 (last/bottom). rivits[] cover 4 floors.
+// HORIZ_LEFT_RIVIT=$36, HORIZ_RIGHT_RIVIT=$6A → canvas *2 = 108, 212
+// (matches ref gap centers 215,423 at 640 → 108,212 at 320).
+const GEO2=[
+  [64,255,70,70],    // W0 top DK/Pauline — no rivets
+  [64,255,100,100],  // W1 rivets (rivits[0])
+  [64,255,132,132],  // W2 rivets (rivits[1])
+  [64,255,164,164],  // W3 rivets (rivits[2])
+  [64,255,196,196],  // W4 rivets (rivits[3])
+  [64,255,228,228],  // W5 bottom start — NO rivets (ASM walkway #$01)
+];
+const ZIG2=GEO2.map(g=>[g[0],g[1]]);
+const NW2=6;
+// ASM Firefox ladder horiz $29,$3D,$61,$75 * 2
+const FOX_LADDER_X=[82,122,194,234];
+const LADDERS2=(()=>{
+  const out=[];
+  for(let w=0;w<5;w++){
+    for(const x of FOX_LADDER_X) out.push({x,from:w,to:w+1});
+  }
+  return out;
+})();
+// Rivets only on middle 4 floors (ref gaps); not top W0, not bottom W5
+const RIVET_WS=[1,2,3,4];
+const RIVET_X=[108,212]; // ASM $36,$6A × 2 — ref hole centers
+const RIVET_HOLE=4;      // half-width px (ref gap ~8px wide at 320)
+const RIVET_LEFT=0x06, RIVET_RIGHT=0x0C, RIVET_DONE=0x12;
+const HAMMER2={w:3,x:168}; // ASM xPosHammer $54 × 2
+// Firefox sprite (ASM FirefoxSprite, top-first)
+const FOX=[0x71,0xAA,0xAA,0x71,0xFF,0xFF,0x7E,0x38];
+
+// ASM constants (TIA space unless noted)
+const FAIR_PIXEL_DELTA=0x09;
+const JUMPING_HEIGHT=0x07;
+const XMIN_LEVEL1=0x24, XMAX_LEVEL1=0x7C;
+const HORIZ_LEFT_RIVIT=0x36, HORIZ_RIGHT_RIVIT=0x6A;
+const STARTING_BARREL_HORIZ=0x25; // TIA; canvas ×2
+const STARTING_BARREL_VERT=0x0C;  // TOP_PLATFORM_VALUE
+const BOTTOM_BARREL_PLATFORM_VALUE=0x91;
+const TOP_PLATFORM_VALUE=0x0C;
+const OBSTACLE_MOVING_RIGHT=0x01, OBSTACLE_MOVING_LEFT=0x00, OBSTACLE_MOVING_DOWN=0xF0;
+// ASM LF900 — difficulty thresholds vs playerScore high byte (0..9)
+const LF900=[0x30,0x50,0x70,0x90,0xB0,0xD0,0xD0,0xD0,0xFF,0xFF];
+// ASM RampHorizValues (~3023) — exact X where barrel drops 1 TIA line on ramp
+const RAMP_HORIZ=[0x75,0x69,0x5D,0x51,0x45,0x3A,0x2D];
+// ASM LadderHorizValues + Down/UpLadderTable (18 entries, indices 0..$11)
+// LadderHoriz: right-to-left from lowest, then reverse block for down-scan
+const LADDER_HORIZ=[
+  0x6D,0x51,0x31,0x59,0x6D,0x45,0x31,0x6D,0x4D,
+  0x4D,0x65,0x41,0x49,0x7B,0x23,0x7B,0x23,0x7B
+];
+const DOWN_LADDER=[
+  0x84,0x65,0x68,0x4A,0x4C,0x2E,0x30,0x15,0x05,
+  0x15,0x2C,0x48,0x81,0x15,0x31,0x4D,0x69,0x85
+];
+const UP_LADDER=[
+  0x9A,0x82,0x7F,0x65,0x63,0x49,0x47,0x2B,0x15,
+  0x2E,0x4B,0x67,0x9A,0x2A,0x46,0x62,0x7E,0x9A
+];
+// ASM FirefoxVerPos — obstacle index 0..3 (low Y = top of screen)
+const FIREFOX_VER_POS=[0x60,0x44,0x28,0x0C];
+// L2 platform TIA base Y so grounded Mario Y = base+FAIR_PIXEL_DELTA matches fox on same floor.
+// Fox floors w=1..4 ← VerPos $0C,$28,$44,$60 (top→bottom). w0 top / w5 bottom extrapolated.
+const L2_TIA_BASE=[0x00,0x0C,0x28,0x44,0x60,0x7C];
+// L1 platform TIA anchors (top $0C .. bottom $91); used for marioTiaY / barrel land snap
+const L1_TIA_BASE=[0x0C,0x28,0x44,0x60,0x7C,0x91,0x9A];
+
+function isFire(){return st.screen===1;}
+function geo(){return isFire()?GEO2:GEO;}
+function zig(){return isFire()?ZIG2:ZIG;}
+function ladders(){return isFire()?LADDERS2:LADDERS;}
+function nW(){return isFire()?NW2:NW;}
+function hammerDef(){return isFire()?HAMMER2:HAMMER;}
+// playerScore high byte index into LF900 (display score / 10000, BCD hundreds-of-hundreds)
+function scoreIdx(){return Math.min(9, Math.floor((st.score|0)/10000));}
+function lf900(){return LF900[scoreIdx()];}
+function nextSeed(){st.seed=(st.seed+1)&0xFF; return st.seed;}
+
+// --- TIA Y ↔ canvas / walkway (certified comparison space for fox + barrels) ---
+function tiaYtoCanvas(ty){
+  // Map ROM playfield $0C..$9A → canvas girder band ~70..228
+  return Math.round(70+((ty-0x0C)*(228-70))/(0x9A-0x0C));
+}
+function canvasToTiaY(cy){
+  return Math.round(0x0C+((cy-70)*(0x9A-0x0C))/(228-70))&0xFF;
+}
+function tiaBaseForWalkway(w){
+  const t=isFire()?L2_TIA_BASE:L1_TIA_BASE;
+  if(w>=0&&w<t.length) return t[w];
+  return t[t.length-1];
+}
+function walkwayFromTiaY(ty){
+  const t=isFire()?L2_TIA_BASE:L1_TIA_BASE;
+  let best=0, bd=1e9;
+  for(let i=0;i<t.length;i++){
+    const d=Math.abs(t[i]-ty);
+    if(d<bd){bd=d;best=i;}
+  }
+  return best;
+}
+// ASM: verPosMario. Grounded = platformBase+FAIR_PIXEL_DELTA; jump subtracts JUMPING_HEIGHT.
+function marioTiaY(){
+  if(st.cl!==0||st.flg){
+    // climbing / falling: continuous canvas→TIA (exact equality rare — matches ROM mid-air miss)
+    return canvasToTiaY(st.my);
+  }
+  const base=tiaBaseForWalkway(st.w);
+  let y=(base+FAIR_PIXEL_DELTA)&0xFF;
+  if(st.jht>0) y=(y-JUMPING_HEIGHT)&0xFF; // ASM sec sbc #JUMPING_HEIGHT at jump start
+  return y;
+}
+function syncBarrelCanvas(o){
+  o.x=(o.tiaX|0)*2;
+  if(o.dir&0x80){
+    // descending ladder — free TIA Y
+    o.y=tiaYtoCanvas(o.tiaY);
+    o.w=walkwayFromTiaY(o.tiaY);
+  }else{
+    o.w=walkwayFromTiaY(o.tiaY);
+    // stick to girder surface for draw/collision (ramps already baked into tiaY steps)
+    o.y=wy(o.w,o.x);
+  }
+}
+
+function resetMarioToStart(){
+  const g=geo();
+  const w=g.length-1;
+  // ASM MARIO_STARTX=$31 → canvas x*2; L1 used center, L2 match ROM start.
+  const mx=isFire()?0x31*2:160;
+  st.w=w; st.mx=mx; st.my=wy(w,mx);
+  st.md=-1; st.jht=0; st.flg=0; st.cl=0; st.ham=0;
+    HAMMER.taken=false;
+  }
+  function startScreen(){
+    // ROM StartNewScreen: clear obstacles, reset positions, init rivits if firefox
+    st.obs=[]; st.ot=0; st.brc=0;
+    st.rivits=[0,0,0,0];
+    resetMarioToStart();
+  if(isFire()){
+        // ASM StartNewFirefox: (seed&$1F)+$25 X, dir=bit0, Y=FirefoxVerPos,x, rivits,x.
+        // ROM walkway index is inverted vs our GEO2 (ROM w0=bottom). We keep GEO2 w1..w4
+        // top→bottom rivet floors and bind rivits[i] to the fox on that floor (same gate
+        // pairing Mario CheckRivits uses for that girder). TIA Y from L2_TIA_BASE so
+        // (foxY+FAIR_PIXEL_DELTA)==marioY when both grounded on that floor.
+        for(let i=0;i<4;i++){
+          const w=i+1;
+          const tiaY=L2_TIA_BASE[w];
+          const seed=nextSeed();
+          const tiaX=0x25+(seed&0x1F);
+          const x=tiaX*2;
+          const d=(tiaX&1)?1:-1;
+          st.obs.push({kind:'fox',x:x,y:wy(w,x),w:w,tiaX:tiaX,tiaY:tiaY,rivetIdx:i,d:d,a:true,s:1});
+        }
+      }
+  }
+
+
+
+// ASM MAX_HAMMER_TIME=$03; dec only when frameCount wraps to 0 (~256 frames/tick)
+const MAX_HAMMER_TIME=0x03;
+// ASM BONUS_TIMER_DELAY=$7F → tick when (frameCount&$7F)==0; STARTING_BONUS=$50 BCD
+const BONUS_TIMER_DELAY=0x7F;
+const STARTING_BONUS=0x50; // BCD 50; UI shows decimal*100 (5000..0100)
+// ASM hammer graphics (13 lines = HAMMER_HEIGHT). Missile=mallet head, Ball=handle.
+// frameCount&$08 selects set 2 vs set 1 (asm ~944-950).
+const MALLET1=[0xF0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00];
+const HANDLE1=[0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xFF,0xFF,0x00,0x00,0x00];
+const MALLET2=[0xFF,0x00,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00];
+const HANDLE2=[0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xFF];
 // HAMMER pickup object: fixed on the board. ROM HAMMER_GROUP=$04 = the lowest
 // girder band (of NUM_WALKWAYS=5), which is my walkway w5 (just above the ground).
-// Placed center-ish, clear of w5's ladders (x=80,100,164,220) so grabbing it
-// doesn't collide with climbing.
 const HAMMER={w:5,x:130,taken:false};
-const HAMMER_DURATION=350;   // ~7s at 50fps (ROM MAX_HAMMER_TIME=3 slow-ticks ≈ several sec)
+
+let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
+        jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
+        cl:0,clx:0,ct:0,bjc:0,bonus:STARTING_BONUS,wt:0,level:1,screen:0,rivits:[0,0,0,0],
+        ham:0,seed:0xA5,
+        // ASM soundDuration/soundIndex + TIA regs
+        sndDur:0,sndIdx:0,audc:0,audf:0,audv:0};
 let keys={},sp=false,lt=0,paused=false,compMode=false;
 let refImg=null;
 function loadRef(){
@@ -219,17 +397,138 @@ function loadRef(){
   refImg.src='ref.gif?'+Date.now();
 }
 
-let ac=null;
-function ia(){if(ac)return;ac=new(window.AudioContext||window.webkitAudioContext)()}
-function pt(f,d,t,v){if(!ac)return;const o=ac.createOscillator(),g=ac.createGain();
-o.type=t||'square';o.frequency.value=f;g.gain.value=v||.08;
-g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);
-o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}
-function sW(){pt(800,.05,'square',.04)}
-function sJ(){pt(600,.1,'square',.08)}
-function sS(){pt(1200,.08,'square',.06)}
-function sD(){pt(200,.3,'sawtooth',.1);setTimeout(()=>pt(150,.4,'sawtooth',.08),300)}
-function sL(){pt(800,.1,'square',.08);setTimeout(()=>pt(1000,.1,'square',.08),100)}
+// === ASM sound engine (AUDC0/AUDF0/AUDV0 + AudioFrequecyTable) ===
+// Tables from donkey_kong_2600.asm ~2098-2110, 2781-2790, 3045, 3524
+const JumpingSoundFrequency=[
+  0x0F,0x0F,0x0F,0x0F,0x0F,0x0F,0x0E,0x0D,0x0D,0x0D,
+  0x0E,0x0F,0x0F,0x0F,0x0F,0x0F,0x0E,0x0D,0x0D,0x0E
+];
+const JumpingSoundFrequency2=[
+  0x0F,0x0F,0x0F,0x0F,0x0E,0x0D,0x0E,0x0F,0x0F,0x0F,0x0E,0x0F
+];
+const WalkingSoundFrequency=[0x1A];
+// NTSC DeathSoundFrequency
+const DeathSoundFrequency=[
+  0x0C,0x0C,0x0C,0x0C,0x11,0x11,0x11,0x08,0x08,0x08,
+  0x0B,0x0A,0x09,0x08,0x07,0x06,0x05
+];
+const ScoringSoundFrequency=[
+  0x0A,0x0A,0x0A,0x0A,0x0A,0x0A,0x0A,
+  0x06,0x06,0x06,0x06,0x06,0x06,0x06,0x06,0x06,0x06,0x06,0x06,
+  0x07,0x07,0x07,0x07,0x07,
+  0x08,0x08,0x08,0x08,0x08,
+  0x0A,0x0A,0x0A,0x0A,0x0A
+];
+// AudioFrequecyTable indexed by soundDuration (1..5) — asm asl / table-2
+const AudioFrequencyTable=[
+  null,
+  JumpingSoundFrequency,      // 1 jump
+  WalkingSoundFrequency,      // 2 walk
+  ScoringSoundFrequency,      // 3 score / game over
+  DeathSoundFrequency,        // 4 death
+  JumpingSoundFrequency2      // 5 level complete
+];
+// Jump reads soundIndex up to $1F — ROM walks into following bytes; concat for fidelity
+const JumpFreqExt=JumpingSoundFrequency.concat(JumpingSoundFrequency2);
+
+let ac=null, osc=null, gain=null;
+function ia(){
+  if(ac){if(ac.state==='suspended')ac.resume();return;}
+  ac=new(window.AudioContext||window.webkitAudioContext)();
+  gain=ac.createGain(); gain.gain.value=0; gain.connect(ac.destination);
+  osc=ac.createOscillator(); osc.type='square'; osc.frequency.value=440;
+  osc.connect(gain); osc.start();
+}
+function tiaHz(audf,audc){
+  // NTSC TIA approx (Stella-style): pure tones /6 for AUDC $0C, /2 for AUDC $04/$05
+  const f=((audf|0)&0x1F)+1;
+  if((audc&0x0F)===0x0C||(audc&0x0F)===0x04) return 31400/(f*6);
+  if((audc&0x0F)===0x05) return 31400/(f*2);
+  return 31400/(f*6);
+}
+function applyTiaAudio(){
+  if(!ac||!osc)return;
+  const v=(st.audv|0)&0x0F;
+  const hz=tiaHz(st.audf|0, st.audc|0);
+  try{
+    osc.frequency.setTargetAtTime(Math.max(20,hz), ac.currentTime, 0.005);
+    gain.gain.setTargetAtTime(v>0?(v/15)*0.12:0, ac.currentTime, 0.008);
+  }catch(e){}
+}
+// ASM PlayMusic: A=soundDuration type, X=soundIndex start
+function playMusic(duration,index){
+  st.sndDur=duration&0xFF;
+  st.sndIdx=index&0xFF;
+  st.audc=0x0C;
+  st.audv=0x0F;
+  // prime first AUDF from table at current index (ROM decs first frame — we dec in updateSound)
+  applyTiaAudio();
+}
+function playDeathSound(){
+  // NTSC: ldx #$11 / lda #$04 / PlayMusic
+  playMusic(4, 0x11);
+}
+function playScoreSound(){
+  // PlayIncrementScoreMusic / PlayGameOverMusic: ldx #$20 / lda #$03
+  playMusic(3, 0x20);
+}
+function playLevelCompleteSound(){
+  // ldx #$0A / lda #$05 / jsr PlayMusic
+  playMusic(5, 0x0A);
+}
+function playWalkSound(){
+  // ASM: only if soundDuration==0; AUDC=$05 AUDV=$0B dur=2 idx=2
+  if(st.sndDur)return;
+  st.audc=0x05; st.audv=0x0B;
+  st.sndDur=2; st.sndIdx=2;
+  st.audf=WalkingSoundFrequency[0];
+  applyTiaAudio();
+}
+function playJumpSound(){
+  // firebutton: soundDuration=1, soundIndex=JUMP_HANGTIME
+  st.sndDur=1; st.sndIdx=0x1F;
+  st.audc=0x0C;
+  st.audv=0x0F;
+}
+// Per-frame ROM audio driver (~966-997) + jump volume (~783-790)
+function updateSound(){
+  // JumpingMario volume envelope while hang + duration==1
+  if(st.jht>0 && st.sndDur===1){
+    st.audc=0x0C;
+    st.audv=(st.jht>>1)&0x0F;
+  }
+  if(!st.sndDur){
+    st.audv=0;
+    applyTiaAudio();
+    return;
+  }
+  // duration>=4: advance every 4 frames; duration 1-3: every frame
+  if(st.sndDur>=4 && (st.fr&3)!==0){
+    applyTiaAudio();
+    return;
+  }
+  st.sndIdx--;
+  if(st.sndIdx<0){
+    st.sndDur=0; st.audv=0; applyTiaAudio(); return;
+  }
+  let table=AudioFrequencyTable[st.sndDur];
+  if(st.sndDur===1) table=JumpFreqExt;
+  if(!table){ st.audv=0; applyTiaAudio(); return; }
+  const idx=st.sndIdx;
+  st.audf=(idx<table.length)?(table[idx]&0x1F):(table[table.length-1]&0x1F);
+  if(st.sndDur!==1||st.jht<=0){
+    // keep PlayMusic volume unless jump envelope owns it
+    if(st.sndDur>=3) st.audv=0x0F;
+  }
+  applyTiaAudio();
+}
+// Back-compat wrappers used across update()
+function sW(){playWalkSound()}
+function sJ(){playJumpSound()}
+function sS(){/* bonus tick: ROM silent on timer tick */}
+function sD(){playDeathSound()}
+function sL(){playLevelCompleteSound()}
+function sScore(){playScoreSound()}
 
 window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'){sp=true;cv.focus()
 }if(e.code==='KeyC'){if(!refImg)loadRef();compMode=!compMode}if(e.code==='KeyP'){paused=!paused}if(e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='ArrowLeft'||e.code==='ArrowRight'||e.code==='Space')e.preventDefault()});
@@ -246,21 +545,48 @@ function dS(sp,x,y,clr){
         }
     }
 }
+// Per-row colors (ASM COLUPx stripe tables). colors[r] applies to sprite row r.
+// Null/missing color skips (blank pad rows) or falls back to body red.
+function dSRows(sp,x,y,colors){
+    for(let r=0;r<sp.length;r++){
+        const b=sp[r]; if(!b)continue;
+        const clr=(colors&&colors[r])||R;
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c))dR(x+c,y+r,1,1,clr);
+        }
+    }
+}
+// NUSIZ double-width (Donkey Kong): each bit -> 2px wide
+function dS2x(sp,x,y,clr){
+    for(let r=0;r<sp.length;r++){
+        const b=sp[r]; if(!b)continue;
+        for(let c=0;c<8;c++){
+            if(b&(0x80>>c))dR(x+c*2,y+r,2,1,clr);
+        }
+    }
+}
 
-// ASM 2600 sprites (reversed from feet-first ASM to canvas top-first)
-// StationaryMarioSprite (18 bytes, 18 rows)
-const MARIO_S=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0x1F,0x3F,0x7B,0x76,0x75,0x7B,0x3F,0x1B,0x1B,0x3F,0x00];
-// RunningMarioSprite1 (19 bytes)
-const MARIO_R1=[0x00,0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x9E,0xFE,0xF7,0x7F,0xBD,0xBD,0xFC,0xEE,0x02,0x02,0x06,0x00];
-// RunningMarioSprite2 (21 bytes)
-const MARIO_R2=[0x00,0x00,0x00,0x00,0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x1C,0x3E,0x7E,0x7E,0x0E,0x1F,0x1F,0x0D,0x0C,0x1C,0x00];
-// JumpingMarioSprite (16 bytes)
-const MARIO_J=[0x1C,0x7E,0x1A,0x6B,0xDB,0x0F,0x3E,0xFE,0xFF,0x3F,0xBC,0xFE,0xFF,0x07,0x00,0x00];
-// ClimbingMarioSprite (17 bytes) — ASM listing reversed to canvas top-first
-const MARIO_C=[0x00,0x60,0x7C,0xFC,0xFE,0xFF,0x7F,0x7F,0x7F,0xFE,0xFE,0x7E,0x7E,0x0E,0x1C,0x1C,0x00];
+// === Mario graphics (donkey_kong_2600.asm MarioGraphics ~2000) ===
+// ROM stores feet→head. We reverse once to canvas top-first.
+// Raw bitmap faces LEFT; REFP0/mirror = face RIGHT (asm move-right sets REFLECT).
+function revRows(a){return a.slice().reverse()}
+const MARIO_S=revRows([// StationaryMarioSprite
+  0x00,0x3F,0x1B,0x1B,0x3F,0x7B,0x75,0x76,0x7B,0x3F,0x1F,0x3E,0x0F,0xDB,0x6B,0x1A,0x7E,0x1C
+]);
+const MARIO_R1=revRows([// RunningMarioSprite1
+  0x00,0x06,0x02,0x02,0xEE,0xFC,0xBD,0xBD,0x7F,0xF7,0xFE,0x9E,0x0F,0xDB,0x6B,0x1A,0x7E,0x1C,0x00
+]);
+const MARIO_R2=revRows([// RunningMarioSprite2
+  0x00,0x1C,0x0C,0x0D,0x1F,0x1F,0x0E,0x7E,0x7E,0x3E,0x1C,0x0F,0xDB,0x6B,0x1A,0x7E,0x1C,0x00,0x00,0x00,0x00
+]);
+const MARIO_J=revRows([// JumpingMarioSprite
+  0x00,0x00,0x07,0xFF,0xFE,0xBC,0x3F,0xFF,0xFE,0x3E,0x0F,0xDB,0x6B,0x1A,0x7E,0x1C
+]);
+const MARIO_C=revRows([// ClimbingMarioSprite
+  0x00,0x1C,0x1C,0x0E,0x7E,0x7E,0xFE,0xFE,0x7F,0x7F,0x7F,0xFF,0xFE,0xFC,0x7C,0x60,0x00
+]);
 
 const BAR=[0x3C,0x6E,0xFB,0xBF,0xFD,0xDF,0x76,0x3C]; // ASM HorizontalBarrelSprite
-const BAR2=[0x3C,0x7E,0xDD,0xDF,0xF7,0xB7,0x7E,0x3C];
 const BAR_FALL=[0x7E,0x99,0xBD,0x81,0xBD,0x99,0x7E,0x00]; // ASM FallingBarrelSprite
 
 function mirrorBytes(sp){
@@ -272,23 +598,116 @@ function mirrorBytes(sp){
     }
     return out;
 }
-const MARIO_S_L=mirrorBytes(MARIO_S);
-const MARIO_R1_L=mirrorBytes(MARIO_R1);
-const MARIO_R2_L=mirrorBytes(MARIO_R2);
-const MARIO_J_L=mirrorBytes(MARIO_J);
-const MARIO_C_L=mirrorBytes(MARIO_C);
+// _R = REFP0 reflected (face right). Unmirrored = face left.
+const MARIO_S_R=mirrorBytes(MARIO_S);
+const MARIO_R1_R=mirrorBytes(MARIO_R1);
+const MARIO_R2_R=mirrorBytes(MARIO_R2);
+const MARIO_J_R=mirrorBytes(MARIO_J);
+const MARIO_C_R=mirrorBytes(MARIO_C);
+const BAR_M=mirrorBytes(BAR); // REFP1 frame-flip stand-in for roll anim
+const FOX_M=mirrorBytes(FOX);
 
-// Girlfriend sprite (20 bytes for top-of-level decoration)
+// ASM HorizontalColors / VerticalColors after BLACK pad — feet→head order
+// H: boots BG×2, body RED×8, face WHITE×5, hat RED×2
+const MARIO_H_FEET=[BG_M,BG_M, R,R,R,R,R,R,R,R, W,W,W,W,W, R,R];
+// V climb: boots BG×3, body/hat RED×11
+const MARIO_V_FEET=[BG_M,BG_M,BG_M, R,R,R,R,R,R,R,R,R,R,R];
+// Last solid row = feet contact (ignore blank pad under boots)
+function marioFeetRow(sp){
+    for(let r=sp.length-1;r>=0;r--) if(sp[r]) return r;
+    return sp.length-1;
+}
+// Pin feet-first palette to the solid feet row (not array end — run/jump have pad)
+function marioRowColors(sp,climb){
+    const feet=climb?MARIO_V_FEET:MARIO_H_FEET;
+    const out=new Array(sp.length).fill(null);
+    const footRow=marioFeetRow(sp);
+    // feet[0] → footRow, feet[1] → footRow-1, ... toward head
+    for(let k=0;k<feet.length;k++){
+        const r=footRow-k;
+        if(r>=0&&r<sp.length) out[r]=feet[k];
+    }
+    return out;
+}
+
+// Girlfriend sprite (20 bytes, top-first). Visible rows 3..18 map to GirlfriendColors.
 const GF=[0x00,0x00,0x00,0x07,0x1F,0x3A,0xBF,0x7E,0x9C,0x38,0x7E,0x18,0x3C,0x7E,0xFF,0x7F,0x7E,0x82,0x43,0x00];
+// GirlfriendColors reversed to top-first: BLONDE×6, TQ×2, SASH_RED, TQ×5, YELLOW×2
+const GF_CLR=[B,B,B,YL,YL,YL,YL,YL,YL,TQ,TQ,R,TQ,TQ,TQ,TQ,TQ,YL,YL,B];
+
+// DonkeyKong bitmap (top-first). ROM draws with NUSIZ double-size + BROWN.
+const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
 
 function drawPlats(){
-    for(let y in PLAT_DATA){
-        const spans=PLAT_DATA[y];
-        const yy=parseInt(y);
-        for(let sp of spans){
-            dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
+    if(!isFire()){
+        for(let y in PLAT_DATA){
+            const spans=PLAT_DATA[y];
+            const yy=parseInt(y);
+            for(let sp of spans){
+                dR(sp[0],yy,sp[1]-sp[0]+1,1,BR);
+            }
+        }
+        return;
+    }
+    // L2 flat girders (blue), rivet holes, ladder rungs
+    const col=[40,90,200];
+    const G=geo();
+    for(let w=0;w<G.length;w++){
+        const g=G[w];
+        const y=g[2];
+        const holes=[];
+        const ri=RIVET_WS.indexOf(w);
+        if(ri>=0){
+            const rv=st.rivits[ri]|0;
+            // additive: 6=left, 12=right, 18=both
+            if(rv===RIVET_LEFT||rv>=RIVET_DONE) holes.push(RIVET_X[0]);
+            if(rv===RIVET_RIGHT||rv>=RIVET_DONE) holes.push(RIVET_X[1]);
+        }
+        for(let t=0;t<3;t++){
+            let segs=[[g[0],g[1]]];
+            for(const hx of holes){
+                const next=[];
+                for(const [a,b] of segs){
+                    const lo=hx-RIVET_HOLE, hi=hx+RIVET_HOLE;
+                    if(hi<a||lo>b){next.push([a,b]);continue;}
+                    if(a<lo) next.push([a,lo-1]);
+                    if(hi<b) next.push([hi+1,b]);
+                }
+                segs=next;
+            }
+            for(const [a,b] of segs) if(b>=a) dR(a,y+t,b-a+1,1,col);
+        }
+        for(let x=g[0];x<=g[1];x+=8){
+            if(holes.some(hx=>x>hx-(RIVET_HOLE+1)&&x<hx+(RIVET_HOLE+1))) continue;
+            dR(x,y+3,4,1,col);
         }
     }
+    for(const l of ladders()){
+        const y0=wy(l.from,l.x)+4, y1=wy(l.to,l.x);
+        for(let y=y0;y<y1;y+=4){
+            dR(l.x-3,y,7,1,TQ);
+            dR(l.x-4,y,1,3,TQ); dR(l.x+3,y,1,3,TQ);
+        }
+    }
+}
+function drawRivets(){
+    if(!isFire())return;
+    for(let i=0;i<RIVET_WS.length;i++){
+        const w=RIVET_WS[i], rv=st.rivits[i]|0;
+        for(let k=0;k<2;k++){
+            const pulled=k===0?(rv===RIVET_LEFT||rv>=RIVET_DONE):(rv===RIVET_RIGHT||rv>=RIVET_DONE);
+            if(pulled)continue;
+            const x=RIVET_X[k], y=wy(w,x);
+            dR(x-3,y-1,7,3,O);
+            dR(x-2,y-2,5,1,YL);
+        }
+    }
+}
+function drawFox(o){
+    if(!o||!o.a)return;
+    const faceLeft=o.d<0;
+    const sp=(Math.floor(st.fr/3)%2)?(faceLeft?FOX:FOX_M):(faceLeft?FOX_M:FOX);
+    dS(sp, o.x-4, o.y-8, O);
 }
 
 function drawLadders(){
@@ -297,30 +716,22 @@ function drawLadders(){
     // x-columns are climbable and which walkways they connect — it draws nothing.
 }
 function drawDK(){
-    const DK=[0x38,0x7C,0x55,0x7D,0x45,0x39,0x7F,0xFF,0xFE,0xBC,0xDC,0x5E,0x3E,0x7E,0x7E,0x67,0x67,0xE0,0xE0,0x00];
-    // DK sitting on top walkway — bottom of sprite touches platform top
-    dS(DK,68,wy(0)-19,O);
+    // ROM: NUSIZ0=DOUBLE_SIZE (16px wide), COLUP0=BROWN. Bottom sits on W0.
+    dS2x(DK,64,wy(0)-19,BN);
 }
 function drawGF(){
-    // Pauline sprite at x=115 (shifted right from DK), on same walkway
-    const gx=115,gy=wy(0)-19;
-    for(let r=0;r<GF.length;r++){
-        const b=GF[r];
-        if(b===0)continue;
-        // Colors: top skin/neck = yellow, middle dress = blue, bottom hem = yellow
-        const clr=(r>=3&&r<=6)||(r>=17)?YL:BL;
-        for(let c=0;c<8;c++)if(b&(0x80>>c))dR(gx+c,gy+r,1,1,clr);
-    }
+    // Pauline to the right of double-width DK; ASM GirlfriendColors per scanline
+    dSRows(GF,120,wy(0)-19,GF_CLR);
 }
 function drawBarrel(o){
-    const col=o.fb?[40,100,255]:O;
     const top=o.y-8;
     // dS() draws from the sprite's LEFT edge; o.x is the barrel's CENTER (and the
     // ladder-column x it descends on). Offset by -4 (half the 8px sprite) so the
     // barrel renders centered on the ladder instead of 4px to the right.
     const dx=o.x-4;
-    if(o.s===2){dS(BAR_FALL,dx,top,col);return}
-    dS(Math.floor(st.fr/3)%2?BAR:BAR2,dx,top,col);
+    if(o.s===2){dS(BAR_FALL,dx,top,O);return}
+    // ROM rolls one bitmap; REFP1←frameCount flips P1 — approximate with mirror
+    dS((Math.floor(st.fr/2)%2)?BAR:BAR_M,dx,top,O);
 }
 
 const NFO=[
@@ -336,38 +747,40 @@ const NFO=[
 [0x7E,0x60,0x60,0x7E,0x18,0x18,0x7E,0x00]];
 
 function drawMario(){
-    // Determine sprite based on state
-    // Original ASM sprites are LEFT-facing; _L variants are bit-reversed (RIGHT-facing)
-    const isLeft=st.jht>0?(st.jht_dir===0xFD):(st.md===0||st.md===-1);
-    let sp,topOff;
+    // Facing: raw bitmap = LEFT (NO_REFLECT); mirror = RIGHT (REFLECT).
+    // Idle defaults to RIGHT like ROM init (InitializationTable1 REFLECT).
+    let faceRight;
+    if(st.jht>0) faceRight=(st.jht_dir===0xFE);
+    else if(st.md===0) faceRight=false;
+    else if(st.md===1) faceRight=true;
+    else faceRight=true;
+
+    let sp, climb=false;
     if(st.cl!==0){
-        // CLIMBING: use climb sprite; alternate normal/mirrored every 4 frames
-        // for a leg-swap animation as Mario ascends/descends the ladder.
-        sp=(Math.floor(st.fr/4)%2)?MARIO_C:MARIO_C_L;
-        topOff=16;
+        // Climb: alternate REFP0 each few frames (leg swap)
+        sp=(Math.floor(st.fr/4)%2)?MARIO_C:MARIO_C_R;
+        climb=true;
     }else if(st.jht>0||st.flg){
-        // Jumping: use jump sprite
-        sp=isLeft?MARIO_J:MARIO_J_L;
-        topOff=16;
-    }else if(keys['ArrowLeft']||keys['ArrowRight']){
-        // Walking: alternate run frames every 4 frames
-        const fr=Math.floor(st.fr/4)%2;
-        if(fr){
-            sp=isLeft?MARIO_R1:MARIO_R1_L;
-            topOff=19;
+        sp=faceRight?MARIO_J_R:MARIO_J;
+    }else if(keys['ArrowLeft']||keys['ArrowRight']||(st.md===0||st.md===1)){
+        // Run cycle — even when keys released mid-stride keep last facing run frame if moving flag
+        const run=(keys['ArrowLeft']||keys['ArrowRight']);
+        if(run){
+            const fr=Math.floor(st.fr/4)%2;
+            sp=fr?(faceRight?MARIO_R1_R:MARIO_R1):(faceRight?MARIO_R2_R:MARIO_R2);
         }else{
-            sp=isLeft?MARIO_R2:MARIO_R2_L;
-            topOff=21;
+            sp=faceRight?MARIO_S_R:MARIO_S;
         }
     }else{
-        // Stationary
-        sp=isLeft?MARIO_S:MARIO_S_L;
-        topOff=18;
+        sp=faceRight?MARIO_S_R:MARIO_S;
     }
-    // st.mx is Mario's CENTER; sprite is 8px wide, dS draws from left edge -> shift left 4px
-    const mx=(st.md===0?st.mx-1:(st.md===1?st.mx+1:st.mx))-4;
-    const my=st.my-topOff;
-    dS(sp,mx,my,R);
+    // Feet on platform: feet row at st.my (surface). Sprite top = my - feetRow.
+    const feet=marioFeetRow(sp);
+    const top=st.my-feet;
+    // st.mx = center; 8px player → left edge mx-4 (no artificial ±1 lean)
+    const left=st.mx-4;
+    const cols=marioRowColors(sp,climb);
+    dSRows(sp,left,top,cols);
 }
 
 
@@ -395,11 +808,14 @@ function drawBJCount(){
 }
 
 function drawLives(){
+    // Mini stationary Mario heads (hat+face rows only), colored
     for(let i=0;i<st.lives;i++){
+        const cols=marioRowColors(MARIO_S,false);
+        // draw rows 0..7 of standing Mario, 1:1 at bottom HUD
         for(let r=0;r<8;r++){
-            const b=MARIO_S[r];
-            if(r===8)continue;
-            for(let c=0;c<4;c++)if(b&(0x80>>c))dR(8+i*12+c,230+r,1,1,R);
+            const b=MARIO_S[r]; if(!b)continue;
+            const clr=cols[r]||R;
+            for(let c=0;c<8;c++) if(b&(0x80>>c)) dR(6+i*10+c,228+r,1,1,clr);
         }
     }
 }
@@ -456,9 +872,13 @@ function render(){
     cx.fillRect(0,0,320,240);
     drawPlats();
     drawLadders();
+    drawRivets();
     drawDK();
     drawGF();
-    for(let o of st.obs)drawBarrel(o);
+    for(let o of st.obs){
+        if(o.kind==='fox') drawFox(o);
+        else drawBarrel(o);
+    }
     drawMario();
     drawScore();
     drawBJCount();
@@ -467,43 +887,54 @@ function render(){
     drawHammer();
 }
 
-// 8x13 hammer: a handle with a heavy head. Rendered brown handle + grey head.
+// ASM Mallot/Handle anim1/2 enable topology (frameCount&$08).
+// Pose1 (up): head high + mid handle. Pose2 (swing): long head + split handle.
+// Canvas draws solid blocks from those spans (ROM ENAM is 1-bit on/off).
 function drawHammer(){
-    // Pickup on the board (not yet grabbed): sits on its walkway.
-    if(!HAMMER.taken && st.ham<=0){
-        const hy=wy(HAMMER.w,HAMMER.x);
-        drawHammerSprite(HAMMER.x, hy-13, 0);
-        return;
-    }
-    // Active: swings beside Mario on the side he faces, bobbing up/down.
+    const HD=[230,230,240], HN=[180,120,50];
+    const anim2=st.ham>0 && (st.fr&0x08)!==0;
+    let cx0, top, face=1;
     if(st.ham>0){
-        const face=st.md<0?-1:1;
-        const bob=(Math.floor(st.hamt/4)%2)?0:3;   // simple 2-frame swing
-        const hx=st.mx+face*8;
-        drawHammerSprite(hx, st.my-18+bob, face);
+        face=(st.md===0||(st.jht>0&&st.jht_dir===0xFD))?-1:1;
+        // asm offsets in canvas px (TIA×2): mallet ±, handle beside
+        cx0=st.mx+(face<0?-4:18);
+        top=st.my-14;
+    }else if(!HAMMER.taken){
+        const hd=hammerDef();
+        cx0=hd.x; top=wy(hd.w,hd.x)-14; face=1;
+    }else return;
+    if(!anim2){
+        // Anim1: short head on top, handle below-center (Mallot1 line0 / Handle1 7-9)
+        dR(cx0-3, top, 10, 4, HD);
+        dR(cx0+face*2, top+4, 3, 8, HN);
+    }else{
+        // Anim2: long head + handle tip high and low (Mallot2 / Handle2)
+        dR(cx0-4, top, 12, 8, HD);
+        dR(cx0+face*3, top, 3, 3, HN);
+        dR(cx0+face*3, top+10, 3, 3, HN);
     }
 }
-function drawHammerSprite(cx0,top,face){
-    // head (grey block) + handle (brown). cx0 = center x.
-    const HD=[200,200,210], HN=[150,90,30];
-    // head: 8x5 block at top
-    for(let r=0;r<5;r++)for(let c=0;c<8;c++)dR(cx0-4+c,top+r,1,1,HD);
-    // handle: 2px wide, 8px tall, below head, centered
-    for(let r=5;r<13;r++)for(let c=0;c<2;c++)dR(cx0-1+c,top+r,1,1,HN);
+function bcdToDec(b){return ((b>>4)&0xF)*10+(b&0xF);}
+function bcdDec1(b){
+    // SED/SEC/SBC #$01 on bonusTimer
+    let lo=(b&0x0F)-1, hi=(b>>4)&0x0F;
+    if(lo<0){lo=9;hi--;}
+    if(hi<0)return 0;
+    return ((hi&0xF)<<4)|(lo&0xF);
 }
-
 function drawBonus(){
     cx.fillStyle='rgb('+W[0]+','+W[1]+','+W[2]+')';
     cx.font='8px monospace';
     cx.textAlign='left';
-    cx.fillText('BONUS '+st.bonus,4,10);
+    // ROM shows BCD bonusTimer digits; ×100 matches common DK “5000” readout
+    cx.fillText('BONUS '+bcdToDec(st.bonus)*100,4,10);
     cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
-    cx.fillText('L'+st.level,4,20);
+    cx.fillText('L'+st.level+(isFire()?' RIVETS':' BARRELS'),4,20);
 }
 
 function onPlatform(mx,my){
-    for(let w=0;w<NW;w++){
-        const surf=ZIG[w];
+    for(let w=0;w<nW();w++){
+        const surf=zig()[w];
         const gy=wy(w,mx);
         if(mx>=surf[0]&&mx<=surf[1]&&my>=gy&&my<gy+4)return w;
     }
@@ -512,55 +943,130 @@ function onPlatform(mx,my){
 
 function update(){
     st.fr++;
-    if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false}return}
-    if(st.mode===1){st.got++;if(st.got>120){st.mode=0;st.lives=2;st.score=0;st.bt=80;
-        st.w=6;st.mx=160;st.my=228;st.obs=[];st.ot=0;st.bonus=5000;st.level=1;HAMMER.taken=false;st.ham=0;st.hamt=0}return}
-    if(st.mode===2){st.wt++;if(st.wt>150){
-        // next level: fresh board, keep score+lives, reset positions & bonus
-        st.level++;st.mode=128;st.w=6;st.mx=160;st.my=228;st.md=-1;st.obs=[];st.ot=0;
-        st.flg=0;st.jht=0;st.cl=0;st.dcd=0;st.bonus=5000;st.fr=0;HAMMER.taken=false;st.ham=0;st.hamt=0}return}
-    if(st.mode!==128)return;
-    if(st.dcd>0){st.dcd--;return}
-    st.bt--;if(st.bt<=0){st.bt=80;sS()}
-
-    // === BONUS TIMER (arcade DK: ~1 decrement per second; reaching 0 kills Mario) ===
-    if(st.fr%50===0){
-        st.bonus-=100;
-        if(st.bonus<=0){
-            st.bonus=0;
-            st.lives--;sD();
-            if(st.lives<=0){st.mode=1;st.got=0}
-            else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.flg=0;st.bonus=5000;st.ham=0;st.hamt=0}
-            return;
-        }
-    }
-
-    // === HAMMER: pickup + active timer ===
-    // Pickup: Mario stands on the hammer's walkway near its x (and not mid-climb).
-    if(!HAMMER.taken && st.ham<=0 && st.cl===0 && st.w===HAMMER.w && Math.abs(st.mx-HAMMER.x)<8){
-        HAMMER.taken=true;
-        st.ham=HAMMER_DURATION;
-        sJ();   // grab blip
-    }
-    if(st.ham>0){
-        st.ham--;
-        st.hamt++;                 // drive the swing animation
-        if(st.ham<=0){st.hamt=0;}  // hammer expires
-    }
-
-    // === WIN: Mario reaches the top walkway (w0) where DK & Pauline are ===
-    if(st.w===0 && st.cl===0){
-        st.score+=st.bonus;   // award remaining bonus (arcade level-complete payout)
-        st.bonus=0;
-        st.mode=2;st.wt=0;
-        sL();
+    // ASM MainLoop: inc randomSeed each frame
+    st.seed=(st.seed+1)&0xFF;
+    if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false;st.screen=0;st.level=1;startScreen()}return}
+    if(st.mode===1){
+        // game over — PlayGameOverMusic once, then attract
+        if(st.got===0) playScoreSound();
+        st.got++; updateSound();
+        if(st.got>180 && st.sndDur===0){st.mode=0;st.lives=2;st.score=0;st.bt=80;
+            st.level=1;st.screen=0;st.bonus=STARTING_BONUS;HAMMER.taken=false;st.ham=0;st.obs=[];startScreen()}
         return;
     }
+    if(st.mode===2){
+        // ASM: wait until soundDuration != level-complete ($05), then flip screen
+        st.wt++; updateSound();
+        if(st.sndDur!==5 && st.wt>10){
+        // ROM eor gameScreen — flip barrels <-> firefox
+        st.screen^=1; st.level++; st.mode=128;
+            st.flg=0;st.jht=0;st.cl=0;st.dcd=0;st.bonus=STARTING_BONUS;st.fr=0;
+            HAMMER.taken=false;st.ham=0; startScreen();}
+        return;
+    }
+    if(st.mode!==128)return;
+    if(st.dcd>0){st.dcd--;updateSound();return}
+    st.bt--;if(st.bt<=0){st.bt=80}
 
-    // === BARRELS (run at half rate: ASM processes each barrel every 2 frames) ===
+        // === BONUS TIMER (ASM ~356-370) ===
+        // inc frameCount; and #BONUS_TIMER_DELAY($7F); when 0: SED SBC #$01 bonusTimer
+        // ~every 128 frames (~2.1s @60Hz). STARTING_BONUS=$50 BCD. 0 → death.
+        if((st.fr&BONUS_TIMER_DELAY)===0 && st.fr!==0){
+            st.bonus=bcdDec1(st.bonus);
+            if(st.bonus===0){
+                st.lives--;playDeathSound();
+                if(st.lives<=0){st.mode=1;st.got=0}
+                else{st.dcd=90;st.bonus=STARTING_BONUS;resetMarioToStart();}
+                updateSound(); return;
+            }
+        }
+
+        // === HAMMER (ASM CheckMarioWithHammer ~919-963) ===
+        // Pickup: CXM1P hit while jumpHangTime!=0 → hammerTime=MAX_HAMMER_TIME.
+        // Active: horPosHammer = mario ± offset; anim via frameCount&$08.
+        // dec hammerTime only when frameCount==0 (wrap every 256 frames).
+        {
+            const hd=hammerDef();
+            if(st.ham>0){
+                // already holding — asm still updates position each frame
+                if(st.fr>0 && (st.fr&0xFF)===0){
+                    st.ham--;
+                    if(st.ham<=0){st.ham=0;}
+                }
+            }else if(!HAMMER.taken && st.jht>0 && st.cl===0){
+                // jump-overlap stands in for CXM1P (missile/player collision)
+                const hy=wy(hd.w,hd.x);
+                if(Math.abs(st.mx-hd.x)<=10 && Math.abs(st.my-hy)<=16){
+                    HAMMER.taken=true; st.ham=MAX_HAMMER_TIME; // ROM: no unique pickup SFX
+                }
+            }
+        }
+
+        // === WIN CONDITIONS (ASM CheckForLevelComplete) ===
+        if(!isFire()){
+            if(st.w===0 && st.cl===0){
+                st.score+=bcdToDec(st.bonus)*100; st.bonus=0; st.mode=2; st.wt=0; playLevelCompleteSound(); updateSound(); return;
+            }
+        }else if(st.rivits.every(v=>v>=RIVET_DONE)){
+            st.score+=bcdToDec(st.bonus)*100; st.bonus=0; st.mode=2; st.wt=0; playLevelCompleteSound(); updateSound(); return;
+        }
+
+    // === OBSTACLES ===
     st.brc=1-st.brc;
-    if(st.brc){// skip barrel movement on alternating frames (ASM-style half-rate)
-                            const RAMP_X=[112,145,173,203,233,263,293];
+    if(st.brc){
+      if(isFire()){
+                  // --- Firefox AI: certified MoveFirefox (~1138-1210) ---
+                  const TIA_L=HORIZ_LEFT_RIVIT, TIA_R=HORIZ_RIGHT_RIVIT;
+                  const TIA_XMIN=XMIN_LEVEL1, TIA_XMAX=XMAX_LEVEL1;
+                  const thr=lf900();
+                  const mTiaY=marioTiaY();
+                  const mTiaX=st.mx>>1;
+                  for(let oi=0; oi<st.obs.length; oi++){
+                    const o=st.obs[oi];
+                    if(!o.a||o.kind!=='fox') continue;
+                    const ri=(o.rivetIdx!=null)?o.rivetIdx:oi;
+                    const rv=st.rivits[ri]|0;
+                    let tiaX=(o.tiaX!=null)?o.tiaX:(o.x>>1);
+                    const tiaY=(o.tiaY!=null)?o.tiaY:tiaBaseForWalkway(o.w);
+                    // --- rivet constraint (before move) ---
+                    let turn=false;
+                    if(rv>=RIVET_LEFT){
+                      if(rv<RIVET_RIGHT){
+                        if(tiaX===TIA_L) turn=true;
+                      }else{
+                        if(tiaX===TIA_R) turn=true;
+                        else if(rv>=RIVET_DONE && tiaX===TIA_L) turn=true;
+                      }
+                    }
+                    if(turn) o.d=-o.d;
+                    // --- MoveFirefox ±1 TIA ---
+                    let hitEdge=false;
+                    if(o.d>0){
+                      tiaX+=1;
+                      if(tiaX>TIA_XMAX){ o.d=-1; hitEdge=true; }
+                    }else{
+                      tiaX-=1;
+                      if(tiaX<=TIA_XMIN){ o.d=1; hitEdge=true; }
+                    }
+                    o.tiaX=tiaX; o.x=tiaX*2; o.tiaY=tiaY;
+                    // .computeRandomDirection only when not edge-bouncing
+                    if(!hitEdge){
+                      const seed=st.seed&0xFF;
+                      if(seed<0x02){
+                        // ASM: (verPosP1 + FAIR_PIXEL_DELTA) == verPosMario  (exact)
+                        if(((tiaY+FAIR_PIXEL_DELTA)&0xFF)===mTiaY){
+                          // cmp horPos: fox right of Mario → move left
+                          o.d=(tiaX>=mTiaX)?-1:1;
+                        }
+                      }else if(seed<thr){
+                        st.seed=thr;
+                        o.d=-o.d;
+                      }
+                    }
+                    o.y=wy(o.w,o.x);
+                  }
+}else{
+const RAMP_X=[112,145,173,203,233,263,293];
                             const RAMP_L=[44,77,105,135,165,195,225];
                             // Barrel descent ladders = SAME drawn posts Mario climbs
                             // (pixel-measured post centers per walkway gap). Index = walkway o.w.
@@ -650,6 +1156,8 @@ function update(){
                             }
                             } // end if(brc)
 
+      } // end half-rate obstacle move
+
                 st.ot++;
                 // ===== ROM-accurate barrel spawn (StartNewBarrel, overscan slot pool) =====
                 // The ROM has MAX_OBSTACLES=4 slots. Each frame it services ONE slot; if that
@@ -672,9 +1180,8 @@ function update(){
     // === LADDER CLIMBING ===
     // Check mid-climb state first (started on a previous frame)
     if(st.cl!==0){
-        st.mx=st.clx; // lock horizontal position to ladder
-        st.fr++;      // advance frame counter to drive climb leg-swap animation
-        const ty=wy(st.ct,st.clx);
+            st.mx=st.clx; // lock horizontal position to ladder
+            const ty=wy(st.ct,st.clx);
         if(st.cl>0){ // climbing up
             st.my--;
             if(st.my<=ty){st.my=ty;st.w=st.ct;st.cl=0;st.flg=0;st.jht=0}
@@ -683,61 +1190,59 @@ function update(){
             if(st.my>=ty){st.my=ty;st.w=st.ct;st.cl=0;st.flg=0;st.jht=0}
         }
         st.md=-1;
-        return; // exit update — climbing replaces grounded/jumping states
-    }
+                updateSound();
+                return; // exit update — climbing replaces grounded/jumping states
+            }
 
-    // === PLAYER STATE MACHINE (only one state per frame) ===
-    if(st.flg){
-        // FALLING
-        st.my+=2;
-        const pw=onPlatform(st.mx,st.my);
-        if(pw>=0){
-            st.w=pw;st.my=wy(pw,st.mx);st.flg=0;st.jht=0;
-        }
-        if(st.my>wy(6,st.mx)+20){
-            st.lives--;sD();
-            if(st.lives<=0){st.mode=1;st.got=0}
-            else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.flg=0}
-        }
+            // === PLAYER STATE MACHINE (only one state per frame) ===
+            if(st.flg){
+                // FALLING
+                st.my+=2;
+                const pw=onPlatform(st.mx,st.my);
+                if(pw>=0){
+                    st.w=pw;st.my=wy(pw,st.mx);st.flg=0;st.jht=0;
+                }
+                if(st.my>wy(groundW(),st.mx)+20){
+                    st.lives--;playDeathSound();
+                    if(st.lives<=0){st.mode=1;st.got=0}
+                    else{st.dcd=90;resetMarioToStart()}
+                }
     }else if(st.jht>0){
-        // JUMPING — ASM: JUMP_HANGTIME=$1F (31 frames), instant rise/fall
-        st.jht--;
-        // ASM-style: move horizontally at 1px/2frames during jump (same as grounded)
-        // Use mr counter for horizontal movement
-        if(--st.mr<=0){st.mr=2;
-            let jdir=st.jht_dir;
-            if(jdir===0xFD&&st.mx>ZIG[st.w][0])st.mx-=1;
-            if(jdir===0xFE&&st.mx<ZIG[st.w][1])st.mx+=1;
-        }
-        if(st.jht<=0){
-            // ASM: fall back down by JUMPING_HEIGHT ($07)
-            st.my=Math.min(st.my+7,255);
-            const pw=onPlatform(st.mx,st.my);
-            if(pw>=0){st.w=pw;st.my=wy(pw,st.mx);st.jht=0;st.flg=0;st.md=st.jht_dir===0xFD?0:(st.jht_dir===0xFE?1:-1);}
-            else{st.flg=1;}
-        }
-    }else{
-        // GROUNDED
-        // Check for ladder climbing initiation (blocked while carrying the hammer,
-        // per ROM: hammerTime!=0 skips ladder movement).
-        if(keys['ArrowUp']&&st.cl===0&&st.ham<=0){
-            const ladder=LADDERS.find(l=>l.to===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
-            if(ladder){st.cl=1;st.clx=ladder.x;st.ct=ladder.from;return}
-        }
-        if(keys['ArrowDown']&&st.cl===0&&st.ham<=0){
-            const ladder=LADDERS.find(l=>l.from===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
-            if(ladder){st.cl=-1;st.clx=ladder.x;st.ct=ladder.to;return}
-        }
-        // ASM MARIO_MOVE_RATE=$02: move 1px every 2 frames
-        let dir=0xFF;
-        if(--st.mr>0){/*skip movement this frame*/}else{st.mr=2;
-            if(keys['ArrowLeft'])dir=0xFD;
-            if(keys['ArrowRight'])dir=0xFE;
-            const surf=ZIG[st.w];
-            const leftB=surf[0],rightB=surf[1];
-            if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
-            if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
-        }
+            // JUMPING — ASM: JUMP_HANGTIME=$1F, JUMPING_HEIGHT=$07
+            st.jht--;
+            if(--st.mr<=0){st.mr=2;
+                let jdir=st.jht_dir;
+                if(jdir===0xFD&&st.mx>zig()[st.w][0])st.mx-=1;
+                if(jdir===0xFE&&st.mx<zig()[st.w][1])st.mx+=1;
+            }
+            if(st.jht<=0){
+                st.my=Math.min(st.my+7,255);
+                const pw=onPlatform(st.mx,st.my);
+                if(pw>=0){st.w=pw;st.my=wy(pw,st.mx);st.jht=0;st.flg=0;st.md=st.jht_dir===0xFD?0:(st.jht_dir===0xFE?1:-1);}
+                else{st.flg=1;}
+            }
+        }else{
+            // GROUNDED
+            // Check for ladder climbing initiation (blocked while carrying the hammer,
+            // per ROM: hammerTime!=0 skips ladder movement).
+            if(keys['ArrowUp']&&st.cl===0&&st.ham<=0){
+                const ladder=ladders().find(l=>l.to===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
+                if(ladder){st.cl=1;st.clx=ladder.x;st.ct=ladder.from;updateSound();return}
+            }
+            if(keys['ArrowDown']&&st.cl===0&&st.ham<=0){
+                const ladder=ladders().find(l=>l.from===st.w&&Math.abs(l.x-st.mx)<=LADDER_RANGE);
+                                if(ladder){st.cl=-1;st.clx=ladder.x;st.ct=ladder.to;updateSound();return}
+            }
+            // ASM MARIO_MOVE_RATE=$02: move 1 canvas px every 2 frames (prior feel; do not 2x)
+            let dir=0xFF;
+            if(--st.mr>0){/*skip movement this frame*/}else{st.mr=2;
+                if(keys['ArrowLeft'])dir=0xFD;
+                if(keys['ArrowRight'])dir=0xFE;
+                const surf=zig()[st.w];
+                const leftB=surf[0],rightB=surf[1];
+                if(dir===0xFD&&st.mx>leftB){st.mx--;st.md=0}
+                if(dir===0xFE&&st.mx<rightB){st.mx++;st.md=1}
+            }
         // stick to the slanted surface as Mario walks along the girder
         if(!st.flg&&st.jht<=0){
             const gy=wy(st.w,st.mx);
@@ -745,15 +1250,56 @@ function update(){
             if(pw>=0){st.w=pw;st.my=wy(pw,st.mx);st.flg=0}
             else{st.my=gy;}
         }
-        if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))sW();
+        if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))playWalkSound();
         if((keys['Space']||keys['KeyZ'])&&st.hmt<=0){
             st.jht=31; // ASM JUMP_HANGTIME=$1F
             st.jht_dir=st.md<0?0xFF:(st.md===0?0xFD:0xFE);
-            st.my-=7;st.md=-1;sJ();
+                    st.my-=7;st.md=-1;playJumpSound();
         }
     }
 
-    // === HAMMER SMASH: active hammer destroys barrels it overlaps (ROM: +800) ===
+            // === RIVETS (ASM CheckRivits ~683-724) ===
+                // Called after horiz move even while jumping (jump uses jumpingDirection path).
+                // Pulls do NOT check jumpHangTime — only .marioStandingInTheGap does.
+                // cpy #HORIZ_* against horPosMario (TIA). Canvas mx is TIA×2.
+                if(isFire() && !st.flg){
+                    const ri=RIVET_WS.indexOf(st.w);
+                    if(ri>=0){
+                        let rv=st.rivits[ri]|0;
+                        // TIA exact X; with 1px canvas steps accept both pixels that map to the TIA column
+                        const tiaM=st.mx>>1;
+                        const onL=tiaM===0x36||st.mx===0x36*2;
+                        const onR=tiaM===0x6A||st.mx===0x6A*2;
+                        if(onL){
+                            if(rv>=RIVET_DONE){
+                                        if(st.jht<=0){ st.lives--; playDeathSound();
+                                    if(st.lives<=0){st.mode=1;st.got=0;}
+                                            else{st.dcd=90;resetMarioToStart();}
+                                            updateSound(); return; }
+                            }else if(rv<RIVET_LEFT){
+                                        rv+=RIVET_LEFT; st.rivits[ri]=rv; st.score+=100; playScoreSound();
+                            }else if(rv<RIVET_RIGHT){
+                                        if(st.jht<=0){ st.lives--; playDeathSound();
+                                    if(st.lives<=0){st.mode=1;st.got=0;}
+                                            else{st.dcd=90;resetMarioToStart();}
+                                            updateSound(); return; }
+                            }else{
+                                        rv+=RIVET_LEFT; st.rivits[ri]=rv; st.score+=100; playScoreSound();
+                            }
+                        }else if(onR){
+                            if(rv>=RIVET_RIGHT){
+                                        if(st.jht<=0){ st.lives--; playDeathSound();
+                                    if(st.lives<=0){st.mode=1;st.got=0;}
+                                            else{st.dcd=90;resetMarioToStart();}
+                                            updateSound(); return; }
+                            }else{
+                                        rv+=RIVET_RIGHT; st.rivits[ri]=rv; st.score+=100; playScoreSound();
+                            }
+                        }
+                    }
+                }
+
+                // === HAMMER SMASH: active hammer destroys barrels it overlaps (ROM: +800) ===
     if(st.ham>0){
         // Hammer occupies a zone in front of Mario (the side he faces) plus his own
         // cell, roughly Mario's vertical level. Swing bob is cosmetic.
@@ -765,7 +1311,7 @@ function update(){
             if(dx<9 && Math.abs(st.my-o.y)<14){
                 o.a=false;              // smash the barrel
                 st.score+=800;          // ROM SMASHING_OBSTACLE = 800 pts
-                sW();
+                        playScoreSound();
             }
         }
     }
@@ -777,9 +1323,9 @@ function update(){
         for(let o of st.obs){
             if(!o.a)continue;
             if(Math.abs(st.mx-o.x)<6&&Math.abs(st.my-o.y)<12){
-                st.lives--;sD();
+                        st.lives--;playDeathSound();
                 if(st.lives<=0){st.mode=1;st.got=0}
-                else{st.dcd=120;st.my=228;st.mx=160;st.w=6;st.md=-1;st.jht=0;st.ham=0;st.hamt=0}
+                        else{st.dcd=90;resetMarioToStart()}
                 break;
             }
         }
@@ -792,14 +1338,15 @@ function update(){
             if(Math.abs(st.mx-o.x)<6&&st.my<o.y-12){
                 o.bj=1;
                 st.bjc++;
-                st.score+=100;   // jumping a barrel scores 100 (arcade DK)
-                sW();            // jump-success blip
+                        st.score+=100;   // Add100Points → scoring music
+                        playScoreSound();
             }
         }
     }
 
     if(st.hmt>0)st.hmt--;
-}
+            updateSound();
+        }
 
 function drawAttract(){
     const bg=[B,BR,BG,B][Math.floor(st.fr/30)%4];
@@ -809,8 +1356,8 @@ function drawAttract(){
     drawDK();
     drawGF();
     const marMX=160+Math.floor(Math.sin(st.fr/30)*60);
-    const marMY=wy(6,marMX)-16;
-    dS(MARIO_S,marMX,marMY,R);
+        const marMY=wy(groundW(),marMX)-16;
+    dSRows(MARIO_S,marMX,marMY,marioRowColors(MARIO_S,false));
     cx.fillStyle='rgb('+R[0]+','+R[1]+','+R[2]+')';
     cx.font='bold 20px monospace';
     cx.textAlign='center';
@@ -845,7 +1392,7 @@ function drawWin(){
     cx.fillStyle='rgb('+W[0]+','+W[1]+','+W[2]+')';
     cx.font='bold 16px monospace';
     cx.textAlign='center';
-    cx.fillText('LEVEL '+st.level+' CLEARED!',160,90);
+    cx.fillText((isFire()?'RIVETS':'BARRELS')+' L'+st.level+' CLEAR!',160,90);
     cx.fillStyle='rgb('+YL[0]+','+YL[1]+','+YL[2]+')';
     cx.font='10px monospace';
     cx.fillText('SCORE  '+st.score,160,112);
@@ -866,6 +1413,98 @@ function loop(){
     requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
+
+// Debug/playtest API (Playwright bot) — not used by players
+window.__DK={
+  getState(){
+    return {
+      mode:st.mode,screen:st.screen,level:st.level,w:st.w,mx:st.mx,my:st.my,md:st.md,
+        jht:st.jht,ham:st.ham,bonus:st.bonus,bonusDec:bcdToDec(st.bonus),
+        score:st.score,lives:st.lives,fr:st.fr,seed:st.seed,rivits:st.rivits.slice(),cl:st.cl,
+          sndDur:st.sndDur,sndIdx:st.sndIdx,audf:st.audf,audv:st.audv,audc:st.audc,
+      obs:st.obs.filter(o=>o.a).map(o=>({
+                kind:o.kind||'barrel',x:o.x,y:o.y,w:o.w,d:o.d,
+                tiaX:o.tiaX,tiaY:o.tiaY,dir:o.dir,ladderIdx:o.ladderIdx
+              })),
+              hammer:{taken:HAMMER.taken,w:hammerDef().w,x:hammerDef().x,ham:st.ham},
+              ladders:ladders().length,
+              marioTiaY:marioTiaY()
+            };
+          },
+    pause(p){paused=!!p;},
+    start(){sp=true;},
+    keys(k){
+      keys['ArrowLeft']=!!k.left; keys['ArrowRight']=!!k.right;
+      keys['ArrowUp']=!!k.up; keys['ArrowDown']=!!k.down;
+      keys['Space']=!!k.jump; keys['KeyZ']=!!k.jump;
+    },
+    clearKeys(){for(const k of Object.keys(keys))keys[k]=false;},
+    setSeed(v){st.seed=(v|0)&0xFF;},
+    forceL2(){
+      paused=true;
+      st.mode=128; st.screen=1; st.level=2; st.bonus=STARTING_BONUS;
+      st.lives=5; st.score=0; st.dcd=0; st.flg=0; st.jht=0; st.cl=0; st.fr=1; st.seed=0x40;
+      HAMMER.taken=false; st.ham=0; startScreen(); render();
+    },
+    forceL1(){
+      paused=true;
+      st.mode=128; st.screen=0; st.level=1; st.bonus=STARTING_BONUS;
+      st.lives=5; st.score=0; st.dcd=0; st.flg=0; st.jht=0; st.cl=0; st.fr=1; st.seed=0x40;
+      HAMMER.taken=false; st.ham=0; startScreen(); render();
+    },
+    place(w,x){st.w=w;st.mx=x|0;st.my=wy(w,x|0);st.jht=0;st.flg=0;st.cl=0;st.dcd=0;st.mr=0;},
+    tick(n){const N=n||1;for(let i=0;i<N;i++)update();render();},
+    grantHammer(){
+      HAMMER.taken=true; st.ham=MAX_HAMMER_TIME; st.jht=0; st.flg=0; st.md=1; render();
+    },
+    hammerPixelCount(){
+      render();
+      const img=cx.getImageData(0,0,320,240).data;
+      let n=0;
+      const x0=Math.max(0,st.mx-8), x1=Math.min(320,st.mx+40);
+      const y0=Math.max(0,st.my-20), y1=Math.min(240,st.my+2);
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+        const i=(y*320+x)*4;
+        // count bright grey/brown hammer-ish pixels
+        if(img[i]>140&&img[i+1]>80&&img[i+2]>30) n++;
+      }
+      return n;
+    },
+    setRivit(i,v){st.rivits[i]=v;},
+    pullAllRivets(){st.rivits=[0x12,0x12,0x12,0x12];},
+        clearObstacles(){st.obs=[];},
+        // Spawn one barrel at canvas x on walkway w (smash tests)
+        spawnBarrel(w,x){
+          const xx=x|0; const ww=w|0;
+          const o={
+            kind:'barrel',x:xx,w:ww,d:1,s:1,a:true,
+            tiaX:xx>>1,tiaY:tiaBaseForWalkway(ww),
+            dir:OBSTACLE_MOVING_RIGHT
+          };
+          o.y=wy(ww,xx);
+          st.obs.push(o);
+        },
+        // Spawn barrel at exact ASM TIA coords (ladder/ramp certification)
+        spawnBarrelTia(tiaX,tiaY,dir){
+          const o={
+            kind:'barrel',a:true,s:1,
+            tiaX:tiaX&0xFF,tiaY:tiaY&0xFF,
+            dir:(dir==null?OBSTACLE_MOVING_RIGHT:dir)&0xFF,
+            d:((dir==null?1:dir)&1)?1:-1
+          };
+          syncBarrelCanvas(o);
+          st.obs.push(o);
+          return {x:o.x,y:o.y,w:o.w,tiaX:o.tiaX,tiaY:o.tiaY,dir:o.dir};
+        },
+        setFoxTiaY(idx,ty){
+          const foxes=st.obs.filter(o=>o.a&&o.kind==='fox');
+          if(foxes[idx]){
+            foxes[idx].tiaY=ty&0xFF;
+            foxes[idx].w=walkwayFromTiaY(ty&0xFF);
+            foxes[idx].y=wy(foxes[idx].w,foxes[idx].x);
+          }
+        }
+      };
 </script>
 <script src="donkey-kong-bot.js"></script>
 </body>
