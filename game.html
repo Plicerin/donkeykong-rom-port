@@ -333,14 +333,14 @@ function resetMarioToStart(){
   const w=g.length-1;
   // ASM MARIO_STARTX=$31 → canvas x*2; L1 used center, L2 match ROM start.
   const mx=isFire()?0x31*2:160;
-  st.w=w; st.mx=mx; st.my=wy(w,mx);
+  st.w=w; st.mx=mx; st.my=wy(w,mx); st.fdb=0;
   st.md=-1; st.jht=0; st.flg=0; st.cl=0; st.ham=0;
     HAMMER.taken=false;
   }
   function startScreen(){
     // ROM StartNewScreen: clear obstacles, reset positions, init rivits if firefox
     st.obs=[]; st.ot=0; st.brc=0;
-    st.rivits=[0,0,0,0];
+    st.rivits=[0,0,0,0]; st.rivetGrace=0;
     resetMarioToStart();
   if(isFire()){
         // ASM StartNewFirefox: (seed&$1F)+$25 X, dir=bit0, Y=FirefoxVerPos,x, rivits,x.
@@ -378,8 +378,8 @@ const HANDLE2=[0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xFF,0xFF]
 const HAMMER={w:5,x:130,taken:false};
 
 let st={mode:0,w:6,mx:160,my:228,md:-1,mr:0,lives:2,score:0,bt:80,obs:[],brs:80,
-        jht:0,jht_dir:0xFF,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
-        cl:0,clx:0,ct:0,bjc:0,bonus:STARTING_BONUS,wt:0,level:1,screen:0,rivits:[0,0,0,0],
+        jht:0,jht_dir:0xFF,fdb:0,hmt:0,fr:0,ot:0,dcd:0,got:0,flg:0,brc:0,
+        cl:0,clx:0,ct:0,bjc:0,bonus:STARTING_BONUS,wt:0,level:1,screen:0,rivits:[0,0,0,0],rivetGrace:0,
         ham:0,seed:0xA5,
         // ASM soundDuration/soundIndex + TIA regs
         sndDur:0,sndIdx:0,audc:0,audf:0,audv:0};
@@ -533,6 +533,10 @@ function sScore(){playScoreSound()}
 window.addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='Space'){sp=true;cv.focus()
 }if(e.code==='KeyC'){if(!refImg)loadRef();compMode=!compMode}if(e.code==='KeyP'){paused=!paused}if(e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='ArrowLeft'||e.code==='ArrowRight'||e.code==='Space')e.preventDefault()});
 window.addEventListener('keyup',e=>{keys[e.code]=false;e.preventDefault()});
+
+// ASM SWCHA is active-low: bit 7=right, bit 6=left, bit 5=down, bit 4=up.
+function swchaValue(){ let v=0xFF; if(keys['ArrowRight'])v&=0x7F; if(keys['ArrowLeft'])v&=0xBF; if(keys['ArrowDown'])v&=0xDF; if(keys['ArrowUp'])v&=0xEF; return v; }
+function jumpHorizontalDirection(v){ if((v&0x40)===0)return -1; if((v&0x80)===0)return 1; return 0; }
 window.addEventListener('click',()=>cv.focus());
 
 function dR(x,y,w,h,c){cx.fillStyle='rgb('+c[0]+','+c[1]+','+c[2]+')';cx.fillRect(x,y,w,h)}
@@ -610,6 +614,12 @@ const FOX_M=mirrorBytes(FOX);
 // ASM HorizontalColors / VerticalColors after BLACK pad — feet→head order
 // H: boots BG×2, body RED×8, face WHITE×5, hat RED×2
 const MARIO_H_FEET=[BG_M,BG_M, R,R,R,R,R,R,R,R, W,W,W,W,W, R,R];
+// Running poses expose a third lower shoe/leg row.
+const MARIO_WALK_FEET=[BG_M,BG_M,BG_M, R,R,R,R,R,R,R, W,W,W,W,W, R,R];
+// JumpingMarioSprite is 14 visible rows: red hat, white face, red body.
+// ASM MarioColorTable uses HorizontalColors+2 for the jump pose: the two
+// blue-green shoe rows are skipped, leaving red body, white face, red hat.
+const MARIO_J_FEET=[R,R,R,R,R,R,R, W,W,W,W,W, R,R];
 // V climb: boots BG×3, body/hat RED×11
 const MARIO_V_FEET=[BG_M,BG_M,BG_M, R,R,R,R,R,R,R,R,R,R,R];
 // Last solid row = feet contact (ignore blank pad under boots)
@@ -618,8 +628,8 @@ function marioFeetRow(sp){
     return sp.length-1;
 }
 // Pin feet-first palette to the solid feet row (not array end — run/jump have pad)
-function marioRowColors(sp,climb){
-    const feet=climb?MARIO_V_FEET:MARIO_H_FEET;
+function marioRowColors(sp,climb,jump,walking){
+    const feet=jump?MARIO_J_FEET:(climb?MARIO_V_FEET:(walking?MARIO_WALK_FEET:MARIO_H_FEET));
     const out=new Array(sp.length).fill(null);
     const footRow=marioFeetRow(sp);
     // feet[0] → footRow, feet[1] → footRow-1, ... toward head
@@ -750,7 +760,10 @@ function drawMario(){
     // Facing: raw bitmap = LEFT (NO_REFLECT); mirror = RIGHT (REFLECT).
     // Idle defaults to RIGHT like ROM init (InitializationTable1 REFLECT).
     let faceRight;
-    if(st.jht>0) faceRight=(st.jht_dir===0xFE);
+    if(st.jht>0){
+        const jd=jumpHorizontalDirection(st.jht_dir);
+        faceRight=jd>0?true:(jd<0?false:(st.md!==0));
+    }
     else if(st.md===0) faceRight=false;
     else if(st.md===1) faceRight=true;
     else faceRight=true;
@@ -779,7 +792,8 @@ function drawMario(){
     const top=st.my-feet;
     // st.mx = center; 8px player → left edge mx-4 (no artificial ±1 lean)
     const left=st.mx-4;
-    const cols=marioRowColors(sp,climb);
+    const walking=sp===MARIO_R1||sp===MARIO_R1_R||sp===MARIO_R2||sp===MARIO_R2_R;
+    const cols=marioRowColors(sp,climb,st.jht>0||st.flg,walking);
     dSRows(sp,left,top,cols);
 }
 
@@ -943,6 +957,7 @@ function onPlatform(mx,my){
 
 function update(){
     st.fr++;
+    const skipRivetGap=st.rivetGrace>0; st.rivetGrace=0;
     // ASM MainLoop: inc randomSeed each frame
     st.seed=(st.seed+1)&0xFF;
     if(st.mode===0){if(sp){ia();st.mode=128;st.bt=80;sp=false;st.screen=0;st.level=1;startScreen()}return}
@@ -1210,10 +1225,12 @@ const RAMP_X=[112,145,173,203,233,263,293];
     }else if(st.jht>0){
             // JUMPING — ASM: JUMP_HANGTIME=$1F, JUMPING_HEIGHT=$07
             st.jht--;
-            if(--st.mr<=0){st.mr=2;
-                let jdir=st.jht_dir;
-                if(jdir===0xFD&&st.mx>zig()[st.w][0])st.mx-=1;
-                if(jdir===0xFE&&st.mx<zig()[st.w][1])st.mx+=1;
+            // ASM marioFrameDelay uses DEC/BMI: with MARIO_MOVE_RATE=$02,
+            // jump movement occurs every third frame after a move tick.
+            if(--st.mr<0){st.mr=2;
+                const jd=jumpHorizontalDirection(st.jht_dir);
+                if(jd<0&&st.mx>zig()[st.w][0]){st.mx--;st.md=0;st.my=wy(st.w,st.mx)-JUMPING_HEIGHT;}
+                if(jd>0&&st.mx<zig()[st.w][1]){st.mx++;st.md=1;st.my=wy(st.w,st.mx)-JUMPING_HEIGHT;}
             }
             if(st.jht<=0){
                 st.my=Math.min(st.my+7,255);
@@ -1251,10 +1268,15 @@ const RAMP_X=[112,145,173,203,233,263,293];
             else{st.my=gy;}
         }
         if((st.mx&3)===0&&(dir===0xFD||dir===0xFE))playWalkSound();
-        if((keys['Space']||keys['KeyZ'])&&st.hmt<=0){
-            st.jht=31; // ASM JUMP_HANGTIME=$1F
-            st.jht_dir=st.md<0?0xFF:(st.md===0?0xFD:0xFE);
-                    st.my-=7;st.md=-1;playJumpSound();
+        const jumpHeld=keys['Space']||keys['KeyZ'];
+        if(jumpHeld&&st.hmt<=0&&st.fdb===0){
+            st.jht=0x1F; // ASM JUMP_HANGTIME=$1F
+            st.jht_dir=swchaValue(); // ASM jumpingDirection=SWCHA
+            st.my-=JUMPING_HEIGHT;
+            st.fdb=0xFF; // ASM fireButtonDebounce blocks a held button
+            playJumpSound();
+        }else if(!jumpHeld||st.hmt>0){
+            st.fdb=0;
         }
     }
 
@@ -1262,14 +1284,14 @@ const RAMP_X=[112,145,173,203,233,263,293];
                 // Called after horiz move even while jumping (jump uses jumpingDirection path).
                 // Pulls do NOT check jumpHangTime — only .marioStandingInTheGap does.
                 // cpy #HORIZ_* against horPosMario (TIA). Canvas mx is TIA×2.
-                if(isFire() && !st.flg){
+                if(isFire() && !st.flg && !skipRivetGap){
                     const ri=RIVET_WS.indexOf(st.w);
                     if(ri>=0){
                         let rv=st.rivits[ri]|0;
-                        // TIA exact X; with 1px canvas steps accept both pixels that map to the TIA column
-                        const tiaM=st.mx>>1;
-                        const onL=tiaM===0x36||st.mx===0x36*2;
-                        const onR=tiaM===0x6A||st.mx===0x6A*2;
+                        // Canvas mx uses the exact doubled TIA column for the gap check.
+                        const onL=st.mx===RIVET_X[0];
+                        const onR=st.mx===RIVET_X[1];
+
                         if(onL){
                             if(rv>=RIVET_DONE){
                                         if(st.jht<=0){ st.lives--; playDeathSound();
@@ -1277,14 +1299,14 @@ const RAMP_X=[112,145,173,203,233,263,293];
                                             else{st.dcd=90;resetMarioToStart();}
                                             updateSound(); return; }
                             }else if(rv<RIVET_LEFT){
-                                        rv+=RIVET_LEFT; st.rivits[ri]=rv; st.score+=100; playScoreSound();
+                                        rv+=RIVET_LEFT; st.rivits[ri]=rv; st.score+=100; st.rivetGrace=1; playScoreSound();
                             }else if(rv<RIVET_RIGHT){
                                         if(st.jht<=0){ st.lives--; playDeathSound();
                                     if(st.lives<=0){st.mode=1;st.got=0;}
                                             else{st.dcd=90;resetMarioToStart();}
                                             updateSound(); return; }
                             }else{
-                                        rv+=RIVET_LEFT; st.rivits[ri]=rv; st.score+=100; playScoreSound();
+                                        rv+=RIVET_LEFT; st.rivits[ri]=rv; st.score+=100; st.rivetGrace=1; playScoreSound();
                             }
                         }else if(onR){
                             if(rv>=RIVET_RIGHT){
@@ -1293,7 +1315,7 @@ const RAMP_X=[112,145,173,203,233,263,293];
                                             else{st.dcd=90;resetMarioToStart();}
                                             updateSound(); return; }
                             }else{
-                                        rv+=RIVET_RIGHT; st.rivits[ri]=rv; st.score+=100; playScoreSound();
+                                        rv+=RIVET_RIGHT; st.rivits[ri]=rv; st.score+=100; st.rivetGrace=1; playScoreSound();
                             }
                         }
                     }
@@ -1419,7 +1441,7 @@ window.__DK={
   getState(){
     return {
       mode:st.mode,screen:st.screen,level:st.level,w:st.w,mx:st.mx,my:st.my,md:st.md,
-        jht:st.jht,ham:st.ham,bonus:st.bonus,bonusDec:bcdToDec(st.bonus),
+        jht:st.jht,jdir:st.jht_dir,fdb:st.fdb,ham:st.ham,bonus:st.bonus,bonusDec:bcdToDec(st.bonus),
         score:st.score,lives:st.lives,fr:st.fr,seed:st.seed,rivits:st.rivits.slice(),cl:st.cl,
           sndDur:st.sndDur,sndIdx:st.sndIdx,audf:st.audf,audv:st.audv,audc:st.audc,
       obs:st.obs.filter(o=>o.a).map(o=>({
@@ -1452,7 +1474,7 @@ window.__DK={
       st.lives=5; st.score=0; st.dcd=0; st.flg=0; st.jht=0; st.cl=0; st.fr=1; st.seed=0x40;
       HAMMER.taken=false; st.ham=0; startScreen(); render();
     },
-    place(w,x){st.w=w;st.mx=x|0;st.my=wy(w,x|0);st.jht=0;st.flg=0;st.cl=0;st.dcd=0;st.mr=0;},
+    place(w,x){st.w=w;st.mx=x|0;st.my=wy(w,x|0);st.jht=0;st.flg=0;st.cl=0;st.dcd=0;st.mr=0;st.fdb=0;st.rivetGrace=0;},
     tick(n){const N=n||1;for(let i=0;i<N;i++)update();render();},
     grantHammer(){
       HAMMER.taken=true; st.ham=MAX_HAMMER_TIME; st.jht=0; st.flg=0; st.md=1; render();
