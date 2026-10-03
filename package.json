@@ -1,0 +1,17 @@
+{
+  "name": "donkeykong",
+  "version": "1.0.0",
+  "description": "Donkey Kong (Coleco, Atari 2600) translated from the ROM instruction by instruction",
+  "scripts": {
+    "start": "python -m http.server 5500 --bind 127.0.0.1",
+    "verify": "node tools/verify-recomp.mjs 3000 1 cover && node tools/verify-tia.mjs 1000 1",
+    "playtest-old-port": "node archive_old_port/playtest.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}

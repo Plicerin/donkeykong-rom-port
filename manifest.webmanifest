@@ -1,0 +1,15 @@
+{
+  "name": "Donkey Kong",
+  "short_name": "Donkey Kong",
+  "description": "Coleco's Donkey Kong (Atari 2600, 1982), translated from the ROM.",
+  "start_url": "./#play",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0b0812",
+  "theme_color": "#0b0812",
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

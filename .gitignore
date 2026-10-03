@@ -1,0 +1,14 @@
+node_modules/
+playtest-out/
+# the cartridge ROM and anything assembled from the disassembly stay local
+rom/
+*.a26
+*.bin
+tools/dasm/
+tools/build/
+tools/out/
+*.zip
+# third-party screenshots and sprite rips kept for local reference only
+A26_02.gif
+Atari 2600 - Donkey Kong - Miscellaneous - General Sprites.png
+atari-2600-donkey-kong-general-sprites-2110.png

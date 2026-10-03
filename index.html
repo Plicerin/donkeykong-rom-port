@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0812">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Donkey Kong">
+  <link rel="apple-touch-icon" href="img/icon-180.png">
+  <title>Donkey Kong — Atari 2600, Coleco 1982</title>
+  <meta name="description" content="Coleco's Donkey Kong for the Atari 2600, translated from the original cartridge instruction by instruction and checked against the real ROM frame by frame.">
+  <link rel="icon" href="img/icon-192.png">
+  <style>
+    /* Same landing-page system as the Dracula and River Raid ports, in Donkey Kong's TIA colors. */
+    :root {
+      --lp-night: #0b0812;
+      --lp-panel: #181225;
+      --lp-panel-2: #110c1b;
+      --lp-line: #2b2140;
+      --lp-line-2: #3d2f5c;
+      --lp-ink: #efe9f6;
+      --lp-ink-2: #b4a8c8;
+      --lp-ink-3: #7a6e90;
+      --lp-accent: #b56ce0;    /* the girders, TIA $6A */
+      --lp-accent-2: #c98bed;
+      --lp-kong: #b55328;      /* TIA $34 */
+      --lp-mario: #c84848;     /* TIA $46 */
+      --lp-barrel: #ecc860;    /* TIA $2F */
+      --lp-blonde: #fcfc54;    /* TIA $1E */
+      --lp-dress: #54a0c5;     /* TIA $A8 */
+      --lp-rivet: #656fe4;     /* TIA $8A */
+      --lp-bonus: #9ed065;     /* TIA $DA */
+      --lp-link: #cfa2f0;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(120% 70% at 50% -10%, #2a1740 0%, transparent 60%), var(--lp-night);
+      color: var(--lp-ink-2);
+      font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    main { width: min(1120px, 100%); }
+    code, kbd { font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace; }
+    code { color: var(--lp-ink); }
+    a { color: var(--lp-link); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 3px; }
+    kbd {
+      display: inline-block; min-width: 1.5em; padding: 1px 6px; text-align: center;
+      border: 1px solid #4a3a6a; border-bottom-width: 3px; border-radius: 5px;
+      background: #1d1530; color: var(--lp-ink); font-size: 11px; line-height: 1.5;
+    }
+
+    .lp-hero { padding: 40px 0 26px; text-align: center; }
+    .lp-girder { margin: 0 auto 24px; max-width: 460px; height: 14px; border-radius: 3px;
+      background: repeating-linear-gradient(90deg, var(--lp-accent) 0 26px, transparent 26px 32px), linear-gradient(var(--lp-accent), var(--lp-accent)) top / 100% 3px no-repeat, linear-gradient(var(--lp-accent), var(--lp-accent)) bottom / 100% 3px no-repeat;
+      background-size: 32px 4px, 100% 3px, 100% 3px; background-repeat: repeat-x, no-repeat, no-repeat; background-position: 0 50%, top, bottom; opacity: 0.9; }
+    .lp-hero h1 {
+      font-size: clamp(36px, 10vw, 88px); line-height: 0.95; margin: 0; color: #fff; font-weight: 800;
+      letter-spacing: clamp(2px, 1.2vw, 12px); text-transform: uppercase; text-indent: clamp(2px, 1.2vw, 12px);
+      text-shadow: 0 2px 0 #4a1f68, 0 0 46px rgba(181, 108, 224, 0.55);
+    }
+    .lp-hero .lp-year { margin-top: 14px; font-size: 11px; letter-spacing: 5px; text-transform: uppercase; color: var(--lp-ink-3); }
+    .lp-hero .lp-sub { margin: 18px auto 0; max-width: 620px; font-size: 16px; line-height: 1.6; }
+    .lp-hero .lp-sub b { color: var(--lp-ink); font-weight: 600; }
+    .lp-cta { display: flex; justify-content: center; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+    .lp-btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 999px;
+      font-weight: 600; font-size: 14px; border: 1px solid var(--lp-line-2); background: var(--lp-panel);
+      color: var(--lp-ink); cursor: pointer; font-family: inherit; transition: transform 0.12s, background 0.12s, border-color 0.12s;
+    }
+    .lp-btn:hover { transform: translateY(-1px); border-color: #5a4682; text-decoration: none; }
+    .lp-btn.primary { background: var(--lp-accent); border-color: #7a3fa0; color: #170b22; }
+    .lp-btn.primary:hover { background: var(--lp-accent-2); }
+
+    .canvas-shell {
+      width: min(760px, 100%); margin: 0 auto; padding: 18px; border: 1px solid #33264d; border-radius: 20px;
+      background: linear-gradient(180deg, #1d1530 0%, #0d0916 100%);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+    /* Full screen: the game and its touch controls fill the screen. Uses the
+       browser's fullscreen where allowed; iPhone Safari only lets video go
+       fullscreen, so there the page does it with fixed positioning. */
+    .fs-exit { display: none; }
+    body.fs { overflow: hidden; }
+    body.fs main > :not(#play):not(#tc) { display: none; }
+    body.fs #play {
+      position: fixed; inset: 0; z-index: 10; width: auto; margin: 0; border: 0; border-radius: 0; box-shadow: none;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+      background: var(--lp-night);
+    }
+    body.fs .tv { width: min(100%, calc((100dvh - 60px) * 640 / 382)); }
+    body.fs .fs-exit {
+      display: block; position: absolute; z-index: 12; top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right));
+      font: 11px ui-monospace, "Cascadia Mono", monospace; padding: 6px 11px; border-radius: 8px;
+      border: 1px solid var(--lp-line-2); background: rgba(17, 12, 27, 0.85); color: var(--lp-ink); cursor: pointer;
+    }
+    body.fs #tc {
+      position: fixed; z-index: 11; left: 0; right: 0; bottom: 0; width: auto; margin: 0;
+      padding: 12px max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+    }
+    @media (pointer: coarse) and (orientation: portrait) {
+      body.fs .tv { width: min(100%, calc((100dvh - 260px) * 640 / 382)); }
+    }
+    @media (pointer: coarse) and (orientation: landscape) {
+      body.fs .tv { width: min(calc(100% - 250px), calc((100dvh - 30px) * 640 / 382)); }
+      body.fs #status-line { display: none; }
+      body.fs #tc { pointer-events: none; }
+      body.fs #tc button { pointer-events: auto; opacity: 0.8; }
+      body.fs .dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 40px); }
+      body.fs .fire { width: 76px; height: 76px; }
+    }
+    .tv { position: relative; }
+    .tv canvas, .poster img {
+      display: block; width: 100%; height: auto; aspect-ratio: 640 / 382;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+    .tv canvas { border-radius: 6px; border: 1px solid #000; box-shadow: 0 0 0 2px #2b2140, inset 0 0 40px rgba(0, 0, 0, 0.8); background: #000; outline: none; }
+    .tv canvas:focus-visible { box-shadow: 0 0 0 2px var(--lp-accent); }
+    .poster { position: absolute; inset: 0; display: grid; place-items: center; }
+    .poster[hidden] { display: none; }
+    .poster img { position: absolute; inset: 0; height: 100%; border-radius: 6px; }
+    .poster .lp-btn { position: relative; font-size: 16px; padding: 13px 26px; box-shadow: 0 14px 30px -6px #000; }
+    #status-line { margin-top: 14px; font-size: 10px; color: var(--lp-ink-3); letter-spacing: 1px; text-align: center; line-height: 1.9; text-transform: uppercase; font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace; }
+
+    #tc { display: none; justify-content: space-between; align-items: center; width: 340px; max-width: 100%; margin: 14px auto 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 48px); gap: 4px; }
+    .dpad button, .fire { font: 700 18px/1 ui-sans-serif, system-ui, sans-serif; color: var(--lp-ink); background: var(--lp-panel); border: 1px solid var(--lp-line-2); border-radius: 8px; touch-action: none; }
+    .dpad [data-hold="up"] { grid-area: 1 / 2; }
+    .dpad [data-hold="left"] { grid-area: 2 / 1; }
+    .dpad [data-hold="right"] { grid-area: 2 / 3; }
+    .dpad [data-hold="down"] { grid-area: 3 / 2; }
+    .fire { width: 92px; height: 92px; border-radius: 50%; background: var(--lp-mario); border-color: #7f2a2a; color: #fff; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; }
+    @media (pointer: coarse) { #tc { display: flex; } }
+
+    .lp-tray { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; width: min(760px, 100%); margin: 14px auto 0; padding: 0 4px; font-size: 12px; color: var(--lp-ink-3); }
+    .lp-tray .switches { display: flex; flex-wrap: wrap; gap: 8px; }
+    .lp-tray button { font: 11px ui-monospace, "Cascadia Mono", "Courier New", monospace; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--lp-line); background: var(--lp-panel); color: var(--lp-ink-2); cursor: pointer; }
+    .lp-tray button:hover { border-color: var(--lp-line-2); color: var(--lp-ink); }
+    .lp-tray button[aria-pressed="true"] { color: var(--lp-accent); border-color: #6a3f86; }
+
+    .panel.lp { width: min(1000px, 100%); margin: 44px auto 0; padding: 26px clamp(16px, 3vw, 30px); border: 1px solid var(--lp-line); border-radius: 16px; background: linear-gradient(180deg, var(--lp-panel) 0%, var(--lp-panel-2) 100%); }
+    .panel.lp h2 { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--lp-accent); margin: 0 0 10px; }
+    .panel.lp > p.lp-lead { font-size: 15px; line-height: 1.65; margin: 0 0 20px; max-width: 70ch; }
+    .panel.lp p.lp-lead b { color: var(--lp-ink); font-weight: 600; }
+    .lp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+    .lp-card { padding: 18px; border: 1px solid var(--lp-line); border-radius: 12px; background: rgba(255, 255, 255, 0.016); min-width: 0; }
+    .lp-card h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 12px; font-size: 14px; color: var(--lp-ink); font-weight: 600; letter-spacing: 0.02em; }
+    .lp-card h3 .pts { margin-left: auto; font: 600 12px/1 ui-monospace, "Cascadia Mono", monospace; color: var(--lp-barrel); }
+    .lp-card p { font-size: 13.5px; line-height: 1.6; margin: 0 0 9px; }
+    .lp-card p:last-child { margin-bottom: 0; }
+    .lp-card b { color: var(--lp-ink); font-weight: 600; }
+    .lp-card .plate { display: grid; place-items: center; height: 92px; margin: -4px 0 14px; border-radius: 8px; background: #000; }
+    .lp-card .plate img { image-rendering: pixelated; max-width: 100%; }
+    ul.lp-keys { list-style: none; margin: 0; padding: 0; }
+    ul.lp-keys li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); font-size: 13px; }
+    ul.lp-keys li:first-child { border-top: 0; }
+    ul.lp-keys li > span:last-child { text-align: right; flex: 0 0 auto; }
+    .lp-aside { margin-top: 18px; padding: 14px 16px; border-left: 3px solid var(--lp-accent); background: rgba(181, 108, 224, 0.07); border-radius: 0 10px 10px 0; font-size: 13.5px; line-height: 1.6; }
+    .lp-aside b { color: var(--lp-ink); }
+    .lp-aside ul { margin: 8px 0 0 18px; }
+    .lp-aside li { margin: 4px 0; }
+
+    .screens { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 16px; }
+    .screens figure { margin: 0; }
+    .screens img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--lp-line); image-rendering: pixelated; }
+    .screens figcaption { margin-top: 8px; font-size: 12.5px; line-height: 1.5; color: var(--lp-ink-3); }
+
+    .lp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 4px; }
+    .lp-stat { padding: 16px; border: 1px solid var(--lp-line); border-radius: 12px; text-align: center; background: rgba(255, 255, 255, 0.016); }
+    .lp-stat .n { display: block; font-size: 30px; line-height: 1.1; font-weight: 700; color: var(--lp-accent); font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace; font-variant-numeric: tabular-nums; }
+    .lp-stat .t { display: block; margin-top: 7px; font-size: 12px; line-height: 1.45; color: var(--lp-ink-3); }
+
+    details.lp-dev { width: min(1000px, 100%); margin: 0 auto; }
+    details.lp-dev > summary { cursor: pointer; list-style: none; margin-top: 40px; padding: 13px 16px; border: 1px solid var(--lp-line); border-radius: 12px; background: var(--lp-panel-2); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--lp-ink-3); font-family: ui-monospace, "Cascadia Mono", "Courier New", monospace; }
+    details.lp-dev > summary::-webkit-details-marker { display: none; }
+    details.lp-dev > summary:hover { color: var(--lp-ink-2); border-color: var(--lp-line-2); }
+    details.lp-dev ul { list-style: none; padding: 16px 4px 0; display: grid; gap: 8px; font-size: 13px; }
+
+    .lp-foot { width: min(1000px, 100%); margin: 40px auto 0; padding: 22px 4px 56px; border-top: 1px solid var(--lp-line); font-size: 12px; line-height: 1.6; color: var(--lp-ink-3); display: flex; flex-wrap: wrap; gap: 10px 24px; justify-content: space-between; }
+    .lp-foot p { max-width: 70ch; }
+
+    @media (max-width: 640px) {
+      .panel.lp { margin-top: 28px; padding: 20px 16px; }
+      .lp-hero { padding: 28px 0 18px; }
+      .lp-hero .lp-sub { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="lp-hero">
+    <div class="lp-girder" aria-hidden="true"></div>
+    <h1>Donkey Kong</h1>
+    <div class="lp-year">Coleco · Atari 2600 · 1982</div>
+    <p class="lp-sub">Garry Kitchen's two-screen Donkey Kong for the Atari 2600. The cartridge's own program, <b>translated into JavaScript one instruction at a time</b> with every cycle counted, so each barrel, jump and ladder plays exactly as it did on the console.</p>
+    <div class="lp-cta">
+      <a class="lp-btn primary" href="#play">Play now</a>
+      <a class="lp-btn" href="#how">Controls</a>
+      <a class="lp-btn" href="#rom">How it was built</a>
+    </div>
+  </header>
+
+  <div id="play" class="canvas-shell">
+    <div class="tv">
+      <canvas width="640" height="382" tabindex="0" aria-label="Donkey Kong. Arrow keys or WASD to move and climb, Space or Z to jump, Enter for Game Reset."></canvas>
+      <div class="poster" data-poster>
+        <img src="img/start.png" alt="Donkey Kong's barrel screen before a game: Donkey Kong and Pauline at the top, six purple girders joined by ladders, the hammer on the left, Mario at the bottom left, and the score 000000 in blue.">
+        <button class="lp-btn primary" type="button" data-play>Play Donkey Kong</button>
+      </div>
+    </div>
+    <div id="status-line" data-hint aria-live="polite">Press Play, wait for the music, then press fire to start</div>
+    <button type="button" class="fs-exit" data-exit>Exit full screen</button>
+  </div>
+  <div id="tc" aria-label="Touch controls">
+    <div class="dpad">
+      <button type="button" data-hold="up" aria-label="Up">▲</button>
+      <button type="button" data-hold="left" aria-label="Left">◀</button>
+      <button type="button" data-hold="right" aria-label="Right">▶</button>
+      <button type="button" data-hold="down" aria-label="Down">▼</button>
+    </div>
+    <button type="button" class="fire" data-hold="fire">Jump</button>
+  </div>
+  <div class="lp-tray">
+    <div><kbd>←</kbd><kbd>→</kbd> walk · <kbd>↑</kbd><kbd>↓</kbd> climb · <kbd>Space</kbd> jump · <kbd>Enter</kbd> Game Reset</div>
+    <div class="switches">
+      <button type="button" data-reset>Game Reset</button>
+      <button type="button" data-pause>Pause</button>
+      <button type="button" data-mute aria-pressed="false">Mute</button>
+      <button type="button" id="lp-fullscreen">Fullscreen</button>
+    </div>
+  </div>
+
+  <section class="panel lp" id="how">
+    <h2>How to play</h2>
+    <p class="lp-lead">Get Mario to the top. On the barrel screen that means climbing to Pauline; on the rivet screen it means <b>pulling all eight rivets</b> by walking over them. Touch a barrel or a firefox and Mario is gone. The clock is running too: the number at the top is your <b>bonus</b>, and when it reaches zero you lose a life.</p>
+    <div class="lp-grid">
+      <div class="lp-card">
+        <h3>At the controls</h3>
+        <ul class="lp-keys">
+          <li><span>Walk</span><span><kbd>←</kbd><kbd>→</kbd> or <kbd>A</kbd><kbd>D</kbd></span></li>
+          <li><span>Climb</span><span><kbd>↑</kbd><kbd>↓</kbd> or <kbd>W</kbd><kbd>S</kbd></span></li>
+          <li><span>Jump</span><span><kbd>Space</kbd> / <kbd>Z</kbd></span></li>
+          <li><span>Game Reset</span><span><kbd>Enter</kbd></span></li>
+          <li><span>Pause · Mute</span><span><kbd>P</kbd> · <kbd>M</kbd></span></li>
+        </ul>
+      </div>
+      <div class="lp-card">
+        <h3>On a gamepad</h3>
+        <ul class="lp-keys">
+          <li><span>The joystick</span><span>stick or D-pad</span></li>
+          <li><span>Jump</span><span>A · B · X · Y</span></li>
+          <li><span>Game Reset</span><span>Start</span></li>
+          <li><span>Pause</span><span>Back</span></li>
+        </ul>
+        <p style="margin-top: 12px">After Game Reset the cartridge plays its tune; press the button once it ends. Sound starts after your first click or key press, which is the browser's rule, not the cartridge's.</p>
+      </div>
+      <div class="lp-card">
+        <h3>Bonus and lives</h3>
+        <p>Each screen starts with a bonus of <b>5000</b> that drops by 100 about every two seconds. Whatever is left is added to your score when you finish the screen.</p>
+        <p>You have <b>three Marios</b>: the one playing and the squares at the top right.</p>
+      </div>
+    </div>
+    <div class="screens">
+      <figure><img src="img/barrels.png" alt="The barrel screen in play: barrels rolling down the sloped girders while the bonus counts down at the top." width="640" height="382"><figcaption>The barrel screen. Barrels roll down the sloped girders and drop down the ladders.</figcaption></figure>
+      <figure><img src="img/rivets.png" alt="The rivet screen: level blue girders with gaps where rivets have been pulled, and firefoxes on the girders." width="640" height="382"><figcaption>The rivet screen. Pull a rivet and it leaves a gap; stand in one without jumping and you lose a life.</figcaption></figure>
+    </div>
+  </section>
+
+  <section class="panel lp" id="cast">
+    <h2>Who's who</h2>
+    <div class="lp-grid">
+      <div class="lp-card">
+        <div class="plate"><img src="img/sprite_mario.png" alt="Mario" width="66" height="57"></div>
+        <h3>Mario</h3>
+        <p>Walks one pixel every three frames. A jump lifts him <b>7 lines and holds him there for 31 frames</b>, then drops him back: no arc, and he keeps going whichever way you pushed when he took off.</p>
+      </div>
+      <div class="lp-card">
+        <div class="plate"><img src="img/sprite_barrel.png" alt="Barrel" width="60" height="27"></div>
+        <h3>Barrel <span class="pts">100</span></h3>
+        <p>Jump one for 100 points. Up to four barrels or firefoxes are on the screen at once.</p>
+      </div>
+      <div class="lp-card">
+        <div class="plate"><img src="img/sprite_firefox.png" alt="Firefox" width="60" height="27"></div>
+        <h3>Firefox <span class="pts">100</span></h3>
+        <p>The rivet screen's enemy. Each one starts at a random spot, heading a random way.</p>
+      </div>
+      <div class="lp-card">
+        <div class="plate"><img src="img/sprite_hammer.png" alt="Hammer" width="36" height="27"></div>
+        <h3>Hammer <span class="pts">800</span></h3>
+        <p>Jump into it to grab it. While you hold it, anything it hits is smashed for 800 points, but <b>you cannot climb</b> until it wears off.</p>
+      </div>
+      <div class="lp-card">
+        <div class="plate"><img src="img/sprite_kong.png" alt="Donkey Kong" width="108" height="63"></div>
+        <h3>Donkey Kong</h3>
+        <p>Drawn with the player graphics stretched to double width, on the top line of every screen.</p>
+      </div>
+      <div class="lp-card">
+        <div class="plate"><img src="img/sprite_pauline.png" alt="Pauline" width="60" height="54"></div>
+        <h3>Pauline</h3>
+        <p>Colored line by line from her own table, which is how one sprite gets blonde hair and a blue dress.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel lp" id="rom">
+    <h2>Built from the ROM</h2>
+    <p class="lp-lead">This is not an emulator, and not a remake. A translator read the cartridge's 6502 code, using Dennis Debro's disassembly for labels and comments, and wrote out <b>each instruction as a line of JavaScript</b> with its cycle count. The translated game runs on a model of the 2600's TIA and RIOT chips, and a 6502 core runs the real ROM beside it to prove the two match.</p>
+    <div class="lp-stats">
+      <div class="lp-stat"><span class="n">0</span><span class="t">differences from the cartridge in 100,000 compared frames: registers, cycles, RAM, chip writes and pixels</span></div>
+      <div class="lp-stat"><span class="n">1,276</span><span class="t">instructions translated, each with its cycle count</span></div>
+      <div class="lp-stat"><span class="n">262</span><span class="t">scanlines in every frame, the NTSC standard</span></div>
+      <div class="lp-stat"><span class="n">4,096</span><span class="t">bytes in the whole cartridge, code and graphics</span></div>
+    </div>
+    <div class="lp-aside"><b>Read in the ROM.</b> The code holds a few things the manual never mentions:
+      <ul>
+        <li>The number at the top is the bonus while you play. Your score only shows, in blue, between screens and after the game.</li>
+        <li>The score is kept in hundreds: the last two zeros are never stored.</li>
+        <li>Mario dies by hardware: the TIA's collision latch between his sprite and the obstacles is the only test.</li>
+        <li>You pick up the hammer the same way, through the collision latch for the hammer's sprite, and only while jumping.</li>
+        <li>Leave the game alone and the colors start cycling, to keep a still picture from burning into the TV.</li>
+      </ul>
+      The port keeps all of it, because that is the game.</div>
+  </section>
+
+  <details class="lp-dev">
+    <summary>Developer pages</summary>
+    <ul>
+      <li><a href="game.html">Game only</a>: the player on a page of its own</li>
+      <li><a href="https://github.com/Plicerin/donkeykong-rom-port#rom-faithful-engine">Verifying against the ROM</a>: the translator, the 6502 oracle and the comparison scripts</li>
+    </ul>
+  </details>
+
+  <footer class="lp-foot">
+    <p><i>Donkey Kong</i> is © Nintendo; the Atari 2600 version is © 1982 Coleco, programmed by Garry Kitchen. An unofficial preservation project, not affiliated with Nintendo or Coleco. Built with Dennis Debro's disassembly; colors from Stella's NTSC palette. The ROM file is not included.</p>
+    <a href="https://github.com/Plicerin/donkeykong-rom-port">Source on GitHub</a>
+  </footer>
+</main>
+
+<script type="module">
+  import { mountPlayer } from './src/dkPlayer.mjs';
+  const shell = document.getElementById('play');
+  window.__dk = mountPlayer(shell.parentElement);
+  // full screen: the browser's own where allowed (desktop, Android, iPad), and
+  // the same layout without it on iPhone, where only video may go fullscreen
+  const root = document.documentElement;
+  const nativeElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const canNative = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  const setFull = (on) => {
+    document.body.classList.toggle('fs', on);
+    shell.querySelector('canvas').focus({ preventScroll: true });
+  };
+  const enter = () => {
+    setFull(true);
+    if (canNative) (root.requestFullscreen || root.webkitRequestFullscreen)?.call(root)?.catch?.(() => {});
+  };
+  const leave = () => {
+    if (nativeElement()) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    setFull(false);
+  };
+  document.getElementById('lp-fullscreen').addEventListener('click', () => (document.body.classList.contains('fs') ? leave() : enter()));
+  shell.querySelector('[data-exit]').addEventListener('click', leave);
+  for (const event of ['fullscreenchange', 'webkitfullscreenchange']) {
+    document.addEventListener(event, () => { if (!nativeElement()) setFull(false); });
+  }
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && document.body.classList.contains('fs') && !nativeElement()) leave(); });
+</script>
+</body>
+</html>
