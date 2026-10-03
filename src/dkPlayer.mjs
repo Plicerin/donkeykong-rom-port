@@ -110,9 +110,9 @@ export function mountPlayer(root) {
     started = true;
     if (poster) poster.hidden = true;
     canvas.focus({ preventScroll: true });
+    pressReset(); // before the audio: starting it can take a moment, the game should not wait
     await audio.start();
     silence();
-    pressReset();
   }
 
   function togglePause() {
